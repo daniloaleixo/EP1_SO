@@ -1,0 +1,17 @@
+/* ********************************
+    EP1 - Sistemas Operacionais
+    Prof. Daniel Batista
+
+    Danilo Aleixo Gomes de Souza
+    n USP: 7972370
+  
+    Carlos Augusto Motta de Lima
+    n USP: 7991228
+
+********************************** */
+
+
+Primeiramente basta utilizar o comando "make" para compilar os arquivos executáveis.
+O executável ep1sh é o shell conforma o item 1.1 do enunciado do EP1
+Já o executável ep1 é a parte 1.2 do enunciado, que corresponde ao escalonador de processos.
+Os dois arquivos podem ser chamados usando o comando ./ do Linux.

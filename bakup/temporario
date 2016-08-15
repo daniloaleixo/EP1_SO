@@ -1,0 +1,61 @@
+/* isso está no main */
+       /* fim do while*/    
+      /* o segundo argumento da funcao join eh o int que estou retornando como flag
+       pra saber que a thread acabou o processo *
+      if ( pthread_join ( threads[0], &status ) ) {
+        printf("error joining thread.");
+        abort();
+      }
+
+      printf("%d\n", (int) status);
+      if(status == 42)
+      {
+        pthread_mutex_lock(&processadoresSendoUsados[0]);
+        flagProcessadoresEmUso[0] =  LIVRE;
+        pthread_mutex_unlock(&processadoresSendoUsados[0]);
+        printf("entrei\n");
+      }
+      else 
+      {
+        printf("fora\n");
+      }*/
+      
+
+      /* retirar elemento *
+      temp = listaProcessos->prox;
+      copia = retirarLista(listaProcessos);
+      listaProcessos = temp;*/
+
+
+      /* depuracao printf(">>>%s\n, %p\n", copia->nome, copia->prox );
+      printf("%s %s %s", listaProcessos->nome, listaProcessos->prox->nome, listaProcessos->prox->prox->nome);*/
+
+      /*
+
+      printf(">>>%s\n, %p", retirarLista(listaProcessos)->nome );
+      printf("%s\n", retirarLista(listaProcessos)->nome );
+      printf("%s\n", retirarLista(listaProcessos)->nome );
+      */
+
+
+      /* adasd *
+      printf(">>firstComeFirstServed\n");
+      listaProcessos = firstComeFirstServed(listaProcessos);
+      imprimeTodosProcs(listaProcessos);
+
+      printf("\n>>shortest job\n");
+      listaProcessos = shortestJobFirst(listaProcessos);
+      imprimeTodosProcs(listaProcessos);
+
+      printf("\n>>shortest shortestRemainTimeNext\n");
+      listaProcessos = shortestRemainTimeNext(listaProcessos);
+      imprimeTodosProcs(listaProcessos);
+
+      printf("\n>>roundRobin\n");
+      copia = copiaLista(listaProcessos);
+      copia = roundRobin(copia);
+      imprimeTodosProcs(copia);
+
+      printf("\n>>prioridade\n");
+      listaProcessos = escalonamentoPrioridade(listaProcessos);
+      imprimeTodosProcs(listaProcessos);*/
