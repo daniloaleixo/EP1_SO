@@ -1,4 +1,0 @@
-Problemas:
-1 - Decidir como vamos colocar os threads, podemos usar uma thread por processo entao quando o processo acaba a thread morre e o proximo processo cria uma nova thread, ou usar somente um numero x de threads e puxar novos processos quando acabarem
-2 - 
-3 - Chamar o escalonador de processos dentro do bash (execve)

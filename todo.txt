@@ -1,0 +1,2 @@
+Temos que melhorar a função **split (por exemplo, colocar o 32 numa constante)
+

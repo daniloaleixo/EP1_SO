@@ -1,9 +1,9 @@
 #include "StringOps.h"
 
 
-char **split(char *linha, int tamanholinha, char separador, int numeroDeEspacos)
+char **split(char *linha, int tamanhoLinha, char separador, int numeroDeEspacos)
 {
-  int inicio =0, fim = 0;
+  int inicio = 0, fim = 0;
   int i = 0, j = 0;
   char **palavras = mallocSafe(numeroDeEspacos * sizeof(char*));
   for(i = 0; i < numeroDeEspacos; i++)
@@ -12,23 +12,23 @@ char **split(char *linha, int tamanholinha, char separador, int numeroDeEspacos)
   }
 
 
-  for(i = 0; i < tamanholinha; i++)
+  for(i = 0; i < tamanhoLinha; i++)
+  {
+    if(linha[i] == separador)
     {
-      if(linha[i] == separador)
-      {
-        fim = i;
-        /* depuracao printf("%d %d \n", inicio, fim);*/
-        memcpy( palavras[j++], &linha[inicio], fim - inicio);
-        palavras[j-1][fim - inicio] = '\0';
-        /* depuracao printf("palavra %s\n\n", palavras[j - 1]);*/
-        inicio = fim + 1;
-      }   
-    }
-    fim = tamanholinha;
-    memcpy( palavras[j++], &linha[inicio], fim - inicio);
-    palavras[j-1][fim - inicio] = '\0';
+      fim = i;
+      /* depuracao printf("%d %d \n", inicio, fim);*/
+      memcpy( palavras[j++], &linha[inicio], fim - inicio);
+      palavras[j-1][fim - inicio] = '\0';
+      /* depuracao printf("palavra %s\n\n", palavras[j - 1]);*/
+      inicio = fim + 1;
+    }   
+  }
+  fim = tamanhoLinha;
+  memcpy(palavras[j++], &linha[inicio], fim - inicio);
+  palavras[j-1][fim - inicio] = '\0';
 
-    return palavras;
+  return palavras;
 }
 
 
@@ -65,11 +65,11 @@ FILE *criaArquivo(char *nome)
 /*
   mallocSafe: testa o ponteiro devolvido por malloc
  */
-void * mallocSafe (size_t n)
+void *mallocSafe(size_t n)
 {
-  void * pt;
+  void *pt;
   pt = malloc(n);
-  if (pt == NULL) {
+  if(pt == NULL) {
     printf("ERRO na alocacao de memoria.\n\n");
     exit(-1);
   }
