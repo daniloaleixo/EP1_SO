@@ -29,9 +29,9 @@ int main(int argc, char *argv[])
   while(1)
   {
     getcwd(dir, MAX_SIZE_DIR);
-    strcpy(prefixo, "[");
+    strcpy(prefixo, "(");
     strcat(prefixo, dir);
-    strcat(prefixo, "] ");
+    strcat(prefixo, "): ");
 
     comando = readline(prefixo);
     
