@@ -21,8 +21,8 @@
 
 int main(int argc, char *argv[])
 {
-  char *comando, *token, **argv_chamada, *temp[MAX_ARGUMENTOS];
-  char dir[MAX_SIZE_DIR], prefixo[MAX_SIZE_DIR + 3];
+  char *comando, *token, **argv_chamada, *temp[MAX_ARGUMENTOS],
+        dir[MAX_SIZE_DIR], prefixo[MAX_SIZE_DIR + 3];
   pid_t pid;
   int i, conta_tokens;
 

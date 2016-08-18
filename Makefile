@@ -1,27 +1,19 @@
 CC = gcc
 CFLAGS = -Wall -g -O0
 LFLAGS = -lreadline -lpthread
-OUT = ep1 
-IN = ep1.c
+OUT = ep1sh ep1
 OBJS = ep1.o StringOps.o
 
-all: $(OUT) ep1sh
+all: $(OUT)
 
 clean:
 	rm -f $(OUT) $(OBJS) ep1sh.o ep1sh
-	
 
-ep1sh: ep1sh.o StringOps.o
-	$(CC) ep1sh.o StringOps.o $(LFLAGS) -o ep1sh
+ep1: StringOps.o
+	$(CC) ep1.c StringOps.o $(LFLAGS) -o ep1
 
-ep1sh.o: ep1sh.c
-	$(CC) ep1sh.c -c -o ep1sh.o
-
-$(OUT): $(OBJS)
-	$(CC) $(OBJS) $(LFLAGS) -o $(OUT)
-
-ep1.o: $(IN)
-	$(CC) $(IN) -c -o ep1.o
+ep1sh: StringOps.o
+	$(CC) ep1sh.c StringOps.o $(LFLAGS) -o ep1sh
 
 StringOps.o: StringOps.c
 	$(CC) StringOps.c -c -o StringOps.o
