@@ -36,10 +36,10 @@ void *thread_function(Processo *arg);
 
 /* funcoes de escalonamento */
 void firstComeFirstServed(Processo *lista);
-void shortestJobFirst(Processo *lista);
+//void shortestJobFirst(Processo *lista);
 void shortestRemainTimeNext(Processo *lista);
-void roundRobin(Processo *lista);
-void escalonamentoPrioridade(Processo *lista);
+//void roundRobin(Processo *lista);
+//void escalonamentoPrioridade(Processo *lista);
 
 /* funcoes auxliares*/
 float calcularTempoDecorrido();
@@ -116,16 +116,10 @@ int main(int argc, char *argv[])
         firstComeFirstServed(listaProcessos); break;
 
       case 2:
-        shortestJobFirst(listaProcessos); break;
-
-      case 3:
         shortestRemainTimeNext(listaProcessos); break;
 
-      case 4: 
-        roundRobin(listaProcessos); break;
-
-      case 5:
-        escalonamentoPrioridade(listaProcessos); break;
+      case 3:
+        //Multilpas filas
     }
   }else
   {
@@ -267,97 +261,11 @@ void firstComeFirstServed(Processo *listaProcessos)
   }
 }
 
-void shortestJobFirst(Processo *listaProcessos)
-{
-  Processo *temp, *copia;
-  Processo *listaPrioridade = NULL;
-  int i;
-  int threadID = 0;
-  float tempoDecorridoSistema;
-  int contadorLinhaTrace = 0;
-
-  listaProcessos = ordenarMetodo1(listaProcessos);
-
-  while(!(listaProcessos == NULL && listaPrioridade == NULL))
-  {
-    /* procura o proximo 'processador' disponivel */
-    for(threadID = 0; flagProcessadoresEmUso[threadID] != LIVRE; threadID = (threadID + 1) % numProcs);
-
-    tempoDecorridoSistema = calcularTempoDecorrido();
-    while(listaProcessos != NULL && tempoDecorridoSistema > listaProcessos->t0)
-    {
-      /* retirar elemento da lista */
-      pthread_mutex_lock(&naoPodeAcessarProcessos);
-      temp = listaProcessos->prox;
-      copia = retirarLista(listaProcessos);
-      listaProcessos = temp;
-      copia->prox = listaPrioridade;
-      listaPrioridade = copia;
-      pthread_mutex_unlock(&naoPodeAcessarProcessos);
-
-      contadorLinhaTrace++;
-      if(d) fprintf(stderr, "Chegada do processo: %s - na linha %d do trace\n", copia->nome, contadorLinhaTrace);
-    }
-
-    if(listaPrioridade == NULL) continue;
-    else
-    {
-      pthread_mutex_lock(&naoPodeAcessarProcessos);
-      listaPrioridade = ordenarMetodo2(listaPrioridade);
-      temp = listaPrioridade->prox;
-      copia = retirarLista(listaPrioridade);
-      listaPrioridade = temp;
-      pthread_mutex_unlock(&naoPodeAcessarProcessos);
-
-      /*contadorLinhaTrace++;
-      if(d) fprintf(stderr, "Chegada do processo: %s - na linha %d do trace\n", copia->nome, contadorLinhaTrace);*/
-    }
-
-    pthread_mutex_lock(&processadoresSendoUsados[threadID]);
-    flagProcessadoresEmUso[threadID] =  EM_USO;
-    pthread_mutex_unlock(&processadoresSendoUsados[threadID]);
-
-    /* usaremos a variavel t0 agora para guardar a ID da thread - e nao mais o tempo inicial */
-    copia->t0 = threadID;
-    /* criamos a thread de fato e comecamos a executar na funcao thread_function */
-    if(pthread_create(&threads[threadID], NULL, thread_function, copia))
-    {
-      printf("error creating thread.");
-      abort();
-    }
-  }
-}
 
 void shortestRemainTimeNext(Processo *lista)
 {
   lista = ordenarMetodo1(lista);
   MergeSort(&lista, 3);
-  /*return lista;*/
-}
-
-void roundRobin(Processo *lista)
-{
-  Processo *t, *y, *r, *inicial;
-  y = lista;
-  r = NULL;
-  inicial = lista;
-
-  while (y != NULL) { 
-    t = y->prox; 
-    y->prox = r; 
-    r = y; 
-    y = t; 
-  }
-
-  inicial->prox = r;   
-
-  /*return r;*/
-}
-
- void escalonamentoPrioridade(Processo *lista)
-{
-  lista = ordenarMetodo1(lista);
-  MergeSort(&lista, 5);
   /*return lista;*/
 }
 
