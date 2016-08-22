@@ -1,5 +1,6 @@
 # pro viado do guto que inclui o arquivo runfile
 runfile
+readline/
 
 # arquivos de saida
 StringOps.o
