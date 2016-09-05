@@ -46,23 +46,27 @@ int main(int argc, char *argv[])
 
     /* depuracao printf(">>>>%s\n", comando); */
 
-    if(strcmp(token, "pwd") == 0)
+    if(strcmp(token, "exit") == 0) break;
+    else if(strcmp(token, "chmod") == 0)
     {
-      /* chamada de sistema para pegar o diretorio atual */
-      getcwd(dir, MAX_SIZE_DIR);
-      printf("%s\n", dir);
+      temp[0] = strtok(NULL, " ");
+      temp[1] = strtok(NULL, " ");
+
+      long int permissao = strtol(temp[0], 0, 8);
+
+      chmod(temp[1], permissao);
     }
-    else if(strcmp(token, "cd") == 0){
-      chdir(strtok(NULL, " "));
-    }
-    else if(strcmp(token, "exit") == 0) break;
     else if(strcmp(token, "") != 0)
     {
-      if((pid = fork()) < 0) {
+      if((pid = fork()) < 0)
+      {
         perror("falha na criação de processo!");
         exit(1);
-      } else if(pid == 0) {
-        for(conta_tokens = 0; token != NULL; conta_tokens++) {
+      }
+      else if(pid == 0)
+      {
+        for(conta_tokens = 0; token != NULL; conta_tokens++)
+        {
           temp[conta_tokens] = token;
           token = strtok(NULL, " ");
         }
@@ -72,11 +76,14 @@ int main(int argc, char *argv[])
           argv_chamada[i] = temp[i];
         argv_chamada[i] = NULL;
 
-        if(execve(argv_chamada[0], argv_chamada, NULL) == -1) {
+        if(execve(argv_chamada[0], argv_chamada, NULL) == -1)
+        { 
           printf("falha no execve!\n");
           exit(1);
         }
-      } else {
+      }
+      else
+      {
         waitpid(pid, NULL, 0);
       }
     }
