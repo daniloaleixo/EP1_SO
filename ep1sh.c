@@ -56,6 +56,13 @@ int main(int argc, char *argv[])
 
       chmod(temp[1], permissao);
     }
+    else if(strcmp(token, "id") == 0)
+    {
+      temp[0] = strtok(NULL, " ");
+
+      if(strcmp(temp[0], "-u") == 0)
+        printf("%d\n", getuid());
+    }
     else if(strcmp(token, "") != 0)
     {
       if((pid = fork()) < 0)
