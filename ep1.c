@@ -124,7 +124,7 @@ int main(int argc, char *argv[])
       case 3: break;
         //Multilpas filas
     }
-  }else
+  } else
   {
     printf("\nArgumentos incorretos\n");
     printf("Modo de utilizacao: \n\n");
@@ -187,8 +187,6 @@ void *thread_function(Processo *arg)
 
   tempoDecorridoProcesso = calcularTempoDecorrido();
   return NULL;
-
-
 }
 
 /* *****************************************
@@ -387,10 +385,10 @@ Processo *interpretaEntrada(FILE *entrada)
     printf("%s\n", palavras[i]);
   }*/
 
-	x->t0 = atof(palavras[0]);
-	x->nome = palavras[1];
-	x->dt = atof(palavras[2]);
-	x->deadline = atof(palavras[3]);
+  x->t0 = atof(palavras[0]);
+  x->nome = palavras[1];
+  x->dt = atof(palavras[2]);
+  x->deadline = atof(palavras[3]);
   x->prox = NULL;
 
   ant = x;
