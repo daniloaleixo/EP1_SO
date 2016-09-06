@@ -1,14 +1,25 @@
-#include "StringOps.h"
+/* ********************************
+    EP1 - Sistemas Operacionais
+    Prof. Daniel Batista
 
+    Danilo Aleixo Gomes de Souza
+    n USP: 7972370
+  
+    Carlos Augusto Motta de Lima
+    n USP: 7991228
+
+********************************** */
+
+#include "auxiliares.h"
 
 char **split(char *linha, int tamanhoLinha, char separador, int numeroDeEspacos)
 {
   int inicio = 0, fim = 0;
   int i = 0, j = 0;
-  char **palavras = mallocSafe(numeroDeEspacos * sizeof(char*));
+  char **palavras = malloc_safe(numeroDeEspacos * sizeof(char*));
   for(i = 0; i < numeroDeEspacos; i++)
   {
-    palavras[i] = mallocSafe(32 * sizeof(char));
+    palavras[i] = malloc_safe(32 * sizeof(char));
   }
 
 
@@ -32,7 +43,7 @@ char **split(char *linha, int tamanhoLinha, char separador, int numeroDeEspacos)
 }
 
 
-FILE *leEntrada (char *nomeArquivo)
+FILE *le_entrada (char *nomeArquivo)
 {
     FILE *entrada;
     entrada = fopen(nomeArquivo, "r");
@@ -45,7 +56,7 @@ FILE *leEntrada (char *nomeArquivo)
     return entrada;
 }
 
-FILE *criaArquivo(char *nome)
+FILE *cria_arquivo(char *nome)
 {
   FILE *arq;
   arq = fopen(nome, "wt");
@@ -59,9 +70,9 @@ FILE *criaArquivo(char *nome)
 }
 
 /*
-  mallocSafe: testa o ponteiro devolvido por malloc
+  malloc_safe: testa o ponteiro devolvido por malloc
  */
-void *mallocSafe(size_t n)
+void *malloc_safe(size_t n)
 {
   void *pt;
   pt = malloc(n);
@@ -72,7 +83,7 @@ void *mallocSafe(size_t n)
   return pt;
 }
 
-char *readLine(FILE *entrada)
+char *read_line(FILE *entrada)
 {
     char *line, *nLine;
     int n, ch, size;
