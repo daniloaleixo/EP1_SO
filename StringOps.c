@@ -35,29 +35,25 @@ char **split(char *linha, int tamanhoLinha, char separador, int numeroDeEspacos)
 FILE *leEntrada (char *nomeArquivo)
 {
     FILE *entrada;
-    /* depuraçao * printf("entrei leEntrada string: %s\n", nomeArquivo);*/
     entrada = fopen(nomeArquivo, "r");
-    /* depuraçao * printf("entrada %p\n", entrada);*/
     if(entrada == NULL)
     {
-        fprintf(stderr, "Nao consegui ler o arquivo!\n");
-        exit(-1);
+      fprintf(stderr, "Nao consegui ler o arquivo!\n");
+      exit(-1);
     }
 
     return entrada;
-
 }
 
 FILE *criaArquivo(char *nome)
 {
   FILE *arq;
-
   arq = fopen(nome, "wt");
 
-  if (arq == NULL)
+  if(arq == NULL)
   {
-      printf("Problemas na CRIACAO do arquivo\n");
-      return;
+    printf("Problemas na CRIACAO do arquivo\n");
+    return;
   }
   return arq;
 }
@@ -76,36 +72,6 @@ void *mallocSafe(size_t n)
   return pt;
 }
 
-
-
-char *concatenaStrings(char *original, char *add)
-{
-
-  char *novaString;
-  int i = 0, j = 0;
-
-  int tamanho = strlen(original) + strlen(add) + 1;
-  novaString = malloc(tamanho*sizeof(char));
-
-  while(original[i] != '\0')
-  {
-    novaString[i] = original[i];
-    i++;
-  }      
-
-
-  while(add[j] != '\0')
-  {
-    novaString[i] = add[j];
-    i++; j++;
-  }
-
-  novaString[tamanho - 1] = '\0';
-
-  return novaString;
-}
-
-
 char *readLine(FILE *entrada)
 {
     char *line, *nLine;
@@ -115,14 +81,11 @@ char *readLine(FILE *entrada)
     size = 128;
     line = malloc(size * sizeof(char) + 1);
     while((ch = getc(entrada)) != '\n' && ch != EOF)
+      line[n++] = ch;
+    if(n == 0 && ch == EOF)
     {
-        line[n++] = ch;
-
-    }
-    if((n == 0) && (ch == EOF))
-    {
-        free(line);
-        return NULL;
+      free(line);
+      return NULL;
     }
     line[n] = '\0';
     nLine = (char *) malloc(n * sizeof(char) + 1);
