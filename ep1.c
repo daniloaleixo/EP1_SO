@@ -118,7 +118,7 @@ int main(int argc, char *argv[])
       case 2:
         shortestRemainTimeNext(listaProcessos); break;
 
-      case 3:
+      case 3: break;
         //Multilpas filas
     }
   }else
