@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -g -O0
+CFLAGS = -Wall -g -O0 -pedantic
 LFLAGS = -lreadline -lpthread
 OUT = ep1sh ep1
 OBJS = ep1.o StringOps.o
@@ -12,8 +12,8 @@ clean:
 ep1: StringOps.o
 	$(CC) ep1.c StringOps.o $(LFLAGS) -o ep1
 
-ep1sh: StringOps.o
-	$(CC) ep1sh.c StringOps.o $(LFLAGS) -o ep1sh
+ep1sh:
+	$(CC) ep1sh.c $(LFLAGS) $(CFLAGS) -o ep1sh
 
 StringOps.o: StringOps.c
 	$(CC) StringOps.c -c -o StringOps.o
