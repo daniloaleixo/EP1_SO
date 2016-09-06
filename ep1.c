@@ -21,12 +21,11 @@
 #define TRUE 1
 #define FALSE 0
 
-
 typedef struct processo {
   float t0;
   char *nome;
   float dt; /* quanto tempo real da CPU deve ser simulado */
-  float deadline; 
+  float deadline;
   int prioridade;
   struct processo *prox;
 } Processo;
