@@ -25,10 +25,10 @@
 #define FALSE 0
 
 typedef struct processo {
-  float t0;
+  double t0;
   char *nome;
-  float dt; /* quanto tempo real da CPU deve ser simulado */
-  float deadline;
+  double dt; /* quanto tempo real da CPU deve ser simulado */
+  double deadline;
   struct processo *prox;
 } Processo;
 
@@ -42,11 +42,10 @@ void escalonamento_multiplas_filas(Processo *lista);
 
 /* funcoes auxliares*/
 float calcular_tempo_decorrido();
-Processo *ordenar_metodo1(Processo *lista);
 Processo *ordenar_metodo2(Processo *lista);
 Processo *retirar_lista(Processo *lista);
 void imprime_todos_procs();
-Processo *interpreta_entrada(FILE *entrada);
+Processo *interpreta_entrada(char *nome_arquivo);
 Processo *copia_lista(Processo *lista);
 Processo* sorted_merge(Processo* a, Processo* b, int mode);
 void front_back_split(Processo* source, Processo** frontRef, Processo** backRef);
@@ -55,21 +54,19 @@ int compare(Processo *a, Processo *b, int mode);
 /*------------------------------*/
 
 Processo *lista_processos;
-pthread_mutex_t nao_pode_acessar_processos = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t *processadores_sendo_usados;
-pthread_mutex_t semaf_arq_saida = PTHREAD_MUTEX_INITIALIZER;
+pthread_mutex_t semaforo_lista_processos = PTHREAD_MUTEX_INITIALIZER,
+                semafoto_arq_saida = PTHREAD_MUTEX_INITIALIZER,
+                *semaforo_processador;
 pthread_t *threads;
-FILE *saida;
+FILE *arquivo_saida;
 struct timeval tempo_inicial;
-int *flag_processadores_em_uso;
-int numero_metodo_escalonamento = 0, num_procs = 0, d = 0,
-    contador_linha_saida = 0, qtde_mudancas_contexto = 0;
+int num_procs = 0, d = 0, contador_linha_saida = 0,
+    qtde_mudancas_contexto = 0, *processador_em_uso;
 
 
 int main(int argc, char *argv[])
 {
   int i;
-  FILE *trace; 
   char *nome_saida;
   float tempo_decorrido;
   
@@ -79,55 +76,65 @@ int main(int argc, char *argv[])
 
   if(argc >= 4)
   {
-    d = (strcmp(argv[4], "d") == 0);
+    if(argc ==5) d = (strcmp(argv[4], "d") == 0);
 
-    /* pega os parametros */
-    numero_metodo_escalonamento = atoi(argv[1]);
-    trace = le_entrada(argv[2]);
-    nome_saida = argv[3];
-    saida = cria_arquivo(nome_saida);
+    /* le o arquivo de trace da entrada e coloca todos os processos numa
+       lista encadeada (lista_processos) */
+    lista_processos = interpreta_entrada(argv[2]);
 
-    /* numero de processadores */
-    num_procs = get_nprocs();
+    // nome_saida = argv[3];
+    // arquivo_saida = cria_arquivo(nome_saida);
 
-    /* inicializamos o vetor de processadores e os semaforos */
-    flag_processadores_em_uso = malloc_safe(num_procs * sizeof(int));
-    for(i = 0; i < num_procs; i++)
-      flag_processadores_em_uso[i] = LIVRE;
-    processadores_sendo_usados = malloc_safe(num_procs * sizeof(pthread_mutex_t));
-    threads = malloc_safe(num_procs * sizeof(pthread_t));
+    // /* pega o numero de processadores e aloca um vetor de inteiros para
+    //    guardar o estado atual (EM_USO ou LIVRE) de cada processador,
+    //    alem de alocar um vetor de semaforos (um por processador) e um vetor de
+    //    threads (uma por processador) */
+    // num_procs = get_nprocs();
+    // processador_em_uso = malloc_safe(num_procs * sizeof(int));
+    // for(i = 0; i < num_procs; i++)
+    //   processador_em_uso[i] = LIVRE;
+    // semaforo_processador = malloc_safe(num_procs * sizeof(pthread_mutex_t));
+    // threads = malloc_safe(num_procs * sizeof(pthread_t));
 
-    /* pega o processo do arquivo de texto e coloca em uma struct */
-    lista_processos = interpreta_entrada(trace);
-    /* DEPURACAO imprime_todos_procs(lista_processos);*/
-
-    /* escolhe o metodo de escalonamento */
-    switch(numero_metodo_escalonamento)
-    {
-      case 1:
-        first_come_first_served(lista_processos); break;
-
-      case 3:
-        shortest_remaining_time_next(lista_processos); break;
-
-      case 5:
-        escalonamento_multiplas_filas(lista_processos); break;
-    }
-  }
-  else
-    printf("argumentos incorretos\n");
-
-  /* esperar as threads liberarem */
-  if(num_procs != 0)
-  {  
-    for(i = 0; i < num_procs; i++)
-      if(flag_processadores_em_uso[i] == EM_USO) i = 0;
     
-    fprintf(saida, "\n");
-    fclose(saida); 
+    // /* DEPURACAO imprime_todos_procs(lista_processos);*/
 
-    fprintf(stderr, "Quantidade de mudanças de contexto: %d\n", qtde_mudancas_contexto);
+    // /* escolhe o metodo de escalonamento */
+    // switch(atoi(argv[1]))
+    // {
+    //   case 1:
+    //     first_come_first_served(lista_processos);
+    //     break;
+
+    //   case 2:
+    //     shortest_remaining_time_next(lista_processos);
+    //     break;
+
+    //   case 3:
+    //     escalonamento_multiplas_filas(lista_processos);
+    //     break;
+    // }
   }
+  else {
+    printf("\nArgumentos incorretos\n");
+    printf("Modo de utilizacao: \n\n");
+    printf("ep1 <numero do Metodo de Escalonamento> <arquivo de entrada> "
+           "<arquivo de saida>\n\n");
+  }
+
+  /* espera ate que todos os processadores estejam LIVREs (ou seja, espera
+     que todas as threads terminem a execucao) */
+  // if(num_procs != 0)
+  // {  
+  //   for(i = 0; i < num_procs; i++)
+  //     if(processador_em_uso[i] == EM_USO) i = 0;
+    
+  //   fprintf(arquivo_saida, "\n");
+  //   fclose(arquivo_saida);
+
+  //   fprintf(stderr, "Quantidade de mudanças de contexto: %d\n",
+  //           qtde_mudancas_contexto);
+  // }
 
   return 0;
 }
@@ -145,8 +152,9 @@ void *thread_function(Processo *arg)
   
   tempo_inicial_processo = calcular_tempo_decorrido();
 
-  if(d) fprintf(stderr, "O processo %s esta usando a CPU: %d\n", arg->nome, (int) arg->t0);
-
+  if(d)
+    fprintf(stderr, "O processo %s esta usando a CPU: %d\n",
+            arg->nome, (int) arg->t0);
 
   while((tempo_decorridoProcesso = calcular_tempo_decorrido() - tempo_inicial_processo) < arg->dt)
   {
@@ -154,20 +162,20 @@ void *thread_function(Processo *arg)
     i = i % 100000;
   }
 
-  pthread_mutex_lock(&semaf_arq_saida);
+  pthread_mutex_lock(&semafoto_arq_saida);
   /* imprime o nome do processo no arquivo saida*/
-  fprintf(saida, "%s", arg->nome);
+  fprintf(arquivo_saida, "%s", arg->nome);
   /* imprime o tf e o tr no arquivo */
-  fprintf(saida, " %f", calcular_tempo_decorrido());
-  fprintf(saida, " %f\n", tempo_decorridoProcesso);
+  fprintf(arquivo_saida, " %f", calcular_tempo_decorrido());
+  fprintf(arquivo_saida, " %f\n", tempo_decorridoProcesso);
   contador_linha_saida++;
   if(d) fprintf(stderr, "O processo %s terminou e esta na linha %d do arquivo de saida\n", arg->nome, contador_linha_saida);
-  pthread_mutex_unlock(&semaf_arq_saida);
+  pthread_mutex_unlock(&semafoto_arq_saida);
 
 
-  pthread_mutex_lock(&processadores_sendo_usados[(int) arg->t0]);
-  flag_processadores_em_uso[(int) arg->t0] = LIVRE;
-  pthread_mutex_unlock(&processadores_sendo_usados[(int) arg->t0]);
+  pthread_mutex_lock(&semaforo_processador[(int) arg->t0]);
+  processador_em_uso[(int) arg->t0] = LIVRE;
+  pthread_mutex_unlock(&semaforo_processador[(int) arg->t0]);
 
   if(d) fprintf(stderr, "O processo %s esta deixando a CPU: %d\n", arg->nome, (int) arg->t0);
 
@@ -183,85 +191,161 @@ void *thread_function(Processo *arg)
 
   ***************************************** */
 
-void first_come_first_served(Processo *lista_processos)
-{
-  Processo *temp, *copia;
-  int i;
-  int threadID = 0;
-  int contadorLinhaTrace = 0;
+// void first_come_first_served(Processo *lista_processos)
+// {
+//   Processo *processo_atual, *copiaDaLista;
+//   int i, threadID = 0, contadorLinhaTrace = 0;
 
-  lista_processos = ordenar_metodo1(lista_processos);
+//   listaProcessos = ordenarMetodo1(listaProcessos);
+//   /* DEPURACAO * printf("DEPOIS DA ORDENACAO\n"); imprimeTodosProcs(listaProcessos);*/
 
-  /*
-      COMEÇAR AS THREADS 
-  */
+//   /*
+//       COMEÇAR AS THREADS 
+//   */
 
-  /* retirar elemento da lista */
-  pthread_mutex_lock(&nao_pode_acessar_processos);
-  temp = lista_processos->prox;
-  copia = retirar_lista(lista_processos);
-  lista_processos = temp;
-  pthread_mutex_unlock(&nao_pode_acessar_processos);
-  contadorLinhaTrace++;
-  if(d) fprintf(stderr, "Chegada do processo: %s - na linha %d do trace\n", copia->nome, contadorLinhaTrace);
+//   /* retirar elemento da lista */
+//   pthread_mutex_lock(&naoPodeAcessarProcessos);
+//   processo_atual = retiraPrimeiroElementoDaLista(listaProcessos);
 
-  while(copia != NULL)
-  {
-    /* Enquanto o t0 do processo nao entra o sistema espera por isso */
-    /* DEPURACAO printf("temp - t0: %d - copia: %s - %d\n", tempoSistema - tempo_inicialSistema, copia->nome, copia->t0);*/
-    while(calcular_tempo_decorrido() < copia->t0)
-    {
-      usleep(100);
-    }
+//   /* atualizar a lista para o proximo elemento */
+//   copiaDaLista = listaProcessos->prox;
+//   /* DEPURACAO */ printf("LISTA DEVERIA ESTAR SEM O ELEMENTO 0\n"); imprimeTodosProcs(copiaDaLista);
+//   /* DEPURACAO */ printf("AQUI DEVERIA ESTAR O ELEMRNTO Q FOI TIRADO: nome %s\n", processo_atual->nome);
+//   /*listaProcessos = copiaDaLista;*/
+//   pthread_mutex_unlock(&naoPodeAcessarProcessos);
 
-    /* procura o proximo processador disponivel */
-    for(threadID = 0; flag_processadores_em_uso[threadID] != LIVRE; threadID = (threadID + 1) % num_procs);
+  
+//   contadorLinhaTrace++;
+//   if(d) fprintf(stderr, "Chegada do processo: %s - na linha %d do trace\n", processo_atual->nome, contadorLinhaTrace);
+
+//   /* DEPIRACAO */ printf("VAos entrar no lopp FCFS\n");
+//   while(processo_atual != NULL)
+//   {
+//     /* Enquanto o t0 do processo nao entra o sistema espera por isso */
+//     /* DEPURACAO* printf("processo_atual - t0: %d - copiaDaLista: %s - %d\n", processo_atualoSistema - tempoInicialSistema, copiaDaLista->nome, copiaDaLista->t0);*/
+//     while(calcularTempoDecorrido() < processo_atual->t0)
+//     {
+//       /* DEPURACAO printf("Estou esperando processo entrar\n"); */
+//       usleep(100);
+//     }
+
+//     /* procura o proximo processador disponivel */
+//     for(threadID = 0; flagProcessadoresEmUso[threadID] != LIVRE; threadID = (threadID + 1) % numProcs);
        
 
-    /* Criacao da thread */
-    /* sinalizamos que o processador esta sendo usado */
-    pthread_mutex_lock(&processadores_sendo_usados[threadID]);
-    flag_processadores_em_uso[threadID] =  EM_USO;
-    pthread_mutex_unlock(&processadores_sendo_usados[threadID]);
+//     /* Criacao da thread */
+//     /* sinalizamos que o processador esta sendo usado */
+//     pthread_mutex_lock(&processadoresSendoUsados[threadID]);
+//     flagProcessadoresEmUso[threadID] =  EM_USO;
+//     /* DEPRICAO */ printf("Processador %d esta em uso, rodando agora o processo: %s\n", threadID, processo_atual->nome);
+//     pthread_mutex_unlock(&processadoresSendoUsados[threadID]);
 
-    /* usaremos a variavel t0 agora para guardar a ID da thread - e nao mais o tempo inicial */
-    copia->t0 = threadID;
-    /* criamos a thread de fato e comecamos a executar na funcao thread_function */
-    if(pthread_create(&threads[threadID], NULL, thread_function, copia))
-    {
-      printf("error creating thread.");
-      abort();
-    }
+//     /* usaremos a variavel t0 agora para guardar a ID da thread - e nao mais o tempo inicial */
+//     processo_atual->t0 = threadID;
+//     /* criamos a thread de fato e comecamos a executar na funcao thread_function */
+//     if(pthread_create(&threads[threadID], NULL, thread_function, processo_atual))
+//     {
+//       printf("error creating thread.");
+//       abort();
+//     }
 
-    /* 
-        volta a tirar um elemento da lista pra manter a condição de loop 
-    */
-    pthread_mutex_lock(&nao_pode_acessar_processos);
-    /* retirar elemento da lista */
-    if(lista_processos != NULL)
-    {
-      temp = lista_processos->prox;
-      copia = retirar_lista(lista_processos);
-      lista_processos = temp;
+//     /* 
+//         volta a tirar um elemento da lista pra manter a condição de loop 
+//     */
+//     pthread_mutex_lock(&naoPodeAcessarProcessos);
+//     /* retirar elemento da lista*/
+//     if(copiaDaLista != NULL)
+//     {
+//       processo_atual = retiraPrimeiroElementoDaLista(copiaDaLista);
+//       copiaDaLista = copiaDaLista->prox;
 
-      contadorLinhaTrace++;
-      if(d) fprintf(stderr, "Chegada do processo: %s - na linha %d do trace\n", copia->nome, contadorLinhaTrace);
-    }
-    else copia = NULL;
-    pthread_mutex_unlock(&nao_pode_acessar_processos);
-  }
-}
+//       contadorLinhaTrace++;
+//       if(d) fprintf(stderr, "Chegada do processo: %s - na linha %d do trace\n", processo_atual->nome, contadorLinhaTrace);
+//     }
+//     else processo_atual = NULL;
+//     pthread_mutex_unlock(&naoPodeAcessarProcessos);
+//   }
+
+
+//   // ak
+
+//   /*
+//       COMEÇAR AS THREADS 
+//   */
+
+//   /* retirar elemento da lista */
+//   pthread_mutex_lock(&semaforo_lista_processos);
+//   temp = lista_processos->prox;
+//   copia = retirar_lista(lista_processos);
+//   lista_processos = temp;
+//   pthread_mutex_unlock(&semaforo_lista_processos);
+  
+//   if(d)
+//   {
+//     linha_arquivo_trace++;
+//     fprintf(stderr, "Chegada do processo: %s - na linha %d do trace\n",
+//             copia->nome, linha_arquivo_trace);
+//   }    
+
+//   while(copia != NULL)
+//   {
+//     /* Enquanto o t0 do processo nao entra o sistema espera por isso */
+//     /* DEPURACAO printf("temp - t0: %d - copia: %s - %d\n", tempoSistema - tempo_inicialSistema, copia->nome, copia->t0);*/
+//     while(calcular_tempo_decorrido() < copia->t0)
+//     {
+//       usleep(100);
+//     }
+
+//     /* procura o proximo processador disponivel */
+//     for(threadID = 0; processador_em_uso[threadID] != LIVRE; threadID = (threadID + 1) % num_procs);
+       
+
+//     /* Criacao da thread */
+//     /* sinalizamos que o processador esta sendo usado */
+//     pthread_mutex_lock(&semaforo_processador[threadID]);
+//     processador_em_uso[threadID] =  EM_USO;
+//     pthread_mutex_unlock(&semaforo_processador[threadID]);
+
+//     /* usaremos a variavel t0 agora para guardar a ID da thread - e nao mais o tempo inicial */
+//     copia->t0 = threadID;
+//     /* criamos a thread de fato e comecamos a executar na funcao thread_function */
+//     if(pthread_create(&threads[threadID], NULL, thread_function, copia))
+//     {
+//       printf("error creating thread.");
+//       abort();
+//     }
+
+//     /* 
+//         volta a tirar um elemento da lista pra manter a condição de loop 
+//     */
+//     pthread_mutex_lock(&semaforo_lista_processos);
+//     /* retirar elemento da lista */
+//     if(lista_processos != NULL)
+//     {
+//       temp = lista_processos->prox;
+//       copia = retirar_lista(lista_processos);
+//       lista_processos = temp;
+
+//       if(d)
+//       {
+//         linha_arquivo_trace++;
+//         fprintf(stderr, "Chegada do processo: %s - na linha %d do trace\n",
+//                 copia->nome, linha_arquivo_trace);
+//       }
+//     }
+//     else copia = NULL;
+//     pthread_mutex_unlock(&semaforo_lista_processos);
+//   }
+// }
 
 void shortest_remaining_time_next(Processo *lista)
 {
-  lista = ordenar_metodo1(lista);
   merge_sort(&lista, 3);
   /*return lista;*/
 }
 
 void escalonamento_multiplas_filas(Processo *lista)
 {
-  lista = ordenar_metodo1(lista);
   merge_sort(&lista, 5);
   /*return lista;*/
 }
@@ -282,23 +366,6 @@ float calcular_tempo_decorrido()
   }
   return tempo_atual.tv_sec - tempo_inicial.tv_sec +
          (tempo_atual.tv_usec - tempo_inicial.tv_usec)/1e6;
-}
-
-Processo *ordenar_metodo1(Processo *lista)
-{
-  Processo *t, *y, *r;
-  y = lista;
-  r = NULL;
-
-  /* colocar a lista pela ordem do arquivo */
-  while (y != NULL)
-  {
-    t = y->prox; 
-    y->prox = r; 
-    r = y; 
-    y = t; 
-  }
-  return r;   
 }
 
 Processo *ordenar_metodo2(Processo *lista)
@@ -333,64 +400,36 @@ void imprime_todos_procs(Processo *process)
   }
 }
 
-/* a funcao pega a linha com o processo e suas infos do arquivo de texto
-   e retorna o struct processo com todas as infos */
-Processo *interpreta_entrada(FILE *entrada)
+/* le o arquivo de entrada (trace) e devolve uma lista ligada de processos */
+Processo *interpreta_entrada(char *nome_arquivo)
 {
-  char *linha;
-  char **palavras;
-  int tamanho_linha;
-  int i = 0;
-  Processo *ant, *x;
+  Processo *lista, *proc, *novo_proc;
+  FILE *arquivo_entrada = abre_arquivo(nome_arquivo);
+  double t0;
 
-  linha = read_line(entrada);
-  tamanho_linha = strlen(linha);
-  palavras = malloc_safe(5 * sizeof(char*));
-  for(i = 0; i < 5; i++)
-    palavras[i] = malloc_safe(32 * sizeof(char));
-  x = malloc_safe(sizeof(Processo));
+  proc = malloc_safe(sizeof(Processo));
+  lista = proc;
 
-  /* split */
-  palavras = split(linha, tamanho_linha, ' ', 5);
+  proc->nome = malloc_safe(64 * sizeof(char));
+  fscanf(arquivo_entrada,"%lf", &(proc->t0));
+  fscanf(arquivo_entrada,"%s", proc->nome);
+  fscanf(arquivo_entrada,"%lf", &(proc->dt));
+  fscanf(arquivo_entrada,"%lf", &(proc->deadline));
 
-	x->t0 = atof(palavras[0]);
-	x->nome = palavras[1];
-	x->dt = atof(palavras[2]);
-	x->deadline = atof(palavras[3]);
-  x->prox = NULL;
 
-  ant = x;
-  while((linha = read_line(entrada)) != NULL)
+  while(fscanf(arquivo_entrada, "%lf", &t0) == 1)
   {
-    if(strlen(linha) > 5)
-    {
-      tamanho_linha = strlen(linha);
-      palavras = malloc_safe(5 * sizeof(char*));
-      for(i = 0; i < 5; i++)
-        palavras[i] = malloc_safe(32 * sizeof(char));
-      x = malloc_safe(sizeof(Processo));
-
-      /* split */
-      palavras = split(linha, tamanho_linha, ' ', 5);
-
-      /* depuracao * for(i = 0; i < 5; i++)
-      {
-        printf("%s\n", palavras[i]);
-      }*/
-
-      x->t0 = atoi(palavras[0]);
-      x->nome = palavras[1];
-      x->dt = atoi(palavras[2]);
-      x->deadline = atoi(palavras[3]);
-      x->prox = ant;
-      ant = x;
-    }
-    
+    novo_proc = malloc_safe(sizeof(Processo));
+    novo_proc->nome = malloc_safe(64 * sizeof(char));
+    novo_proc->t0 = t0;
+    fscanf(arquivo_entrada,"%s", novo_proc->nome);
+    fscanf(arquivo_entrada,"%lf", &(novo_proc->dt));
+    fscanf(arquivo_entrada,"%lf", &(novo_proc->deadline));
+    proc->prox = novo_proc;
+    proc = novo_proc;
   }
-  /* depuracao printf("%d\n", x->t0);
-  printf("%d\n", x->deadline);*/
 
-  return ant;
+  return lista;
 }
 
 Processo *copia_lista(Processo *lista)

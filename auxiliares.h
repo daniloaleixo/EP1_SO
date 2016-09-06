@@ -14,7 +14,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-FILE *le_entrada(char *nomeArquivo);
+FILE *abre_arquivo(char *nome_arquivo);
 FILE *cria_arquivo(char *nome);
 void *malloc_safe(size_t n);
 char *read_line(FILE *entrada);

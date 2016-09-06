@@ -43,17 +43,17 @@ char **split(char *linha, int tamanhoLinha, char separador, int numeroDeEspacos)
 }
 
 
-FILE *le_entrada (char *nomeArquivo)
+FILE *abre_arquivo(char *nome_arquivo)
 {
-    FILE *entrada;
-    entrada = fopen(nomeArquivo, "r");
-    if(entrada == NULL)
-    {
-      fprintf(stderr, "Nao consegui ler o arquivo!\n");
-      exit(-1);
-    }
+  FILE *entrada;
+  entrada = fopen(nome_arquivo, "r");
+  if(entrada == NULL)
+  {
+    fprintf(stderr, "Nao consegui ler o arquivo!\n");
+    exit(-1);
+  }
 
-    return entrada;
+  return entrada;
 }
 
 FILE *cria_arquivo(char *nome)
