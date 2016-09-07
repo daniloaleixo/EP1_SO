@@ -29,6 +29,7 @@ typedef struct processo {
   char *nome;
   double dt; /* quanto tempo real da CPU deve ser simulado */
   double deadline;
+  double tp; /* quanto tempo real de CPU o processo já consumiu */
   int processador;
   int linha_no_arquivo_trace;
   struct processo *prox;
@@ -54,7 +55,7 @@ void merge_sort(Processo **headRef, int mode);
 int compare(Processo *a, Processo *b, int mode);
 /*------------------------------*/
 
-Processo *lista_processos;
+Processo *lista_processos, *processos_em_execucao;
 pthread_mutex_t semaforo_lista_processos = PTHREAD_MUTEX_INITIALIZER,
                 semaforo_arq_saida = PTHREAD_MUTEX_INITIALIZER,
                 *semaforo_processador;
@@ -141,7 +142,7 @@ void *thread_function(void *arg)
 
   if(depurar)
     fprintf(stderr, "%8.4fs | O processo %s esta usando a CPU: %d\n",
-            tempo_decorrido(), proc->nome, (int) proc->t0);
+            tempo_decorrido(), proc->nome, proc->processador);
 
   while(tempo_decorrido_processo < proc->dt)
   {
@@ -197,13 +198,12 @@ void first_come_first_served()
     /* procura um processador disponivel */
     for(i = 0; estado_processador[i] != LIVRE; i = (i + 1) % num_procs);
        
-    /* marca o processador encontrado como EM_USO*/
+    /* marca o processador encontrado como EM_USO e, no processo a ser rodado,
+       o processador que ele está usando como i+1 */
     pthread_mutex_lock(&semaforo_processador[i]);
     estado_processador[i] = EM_USO;
+    processo_atual->processador = i + 1;
     pthread_mutex_unlock(&semaforo_processador[i]);
-
-    /* marca em processo_atual o numero do processador que o esta rodando */
-    processo_atual->processador = i;
 
     /* cria uma thread para o processo_atual e roda ela durante
        processo_atual->dt segundos (com consumo de CPU) */
