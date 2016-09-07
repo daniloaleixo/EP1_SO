@@ -1,15 +1,15 @@
-1 processo0 2 11
-2 processo1 2 5
-2 processo2 2 4
-2 processo3 2 3
-2 processo4 2 21
-2 processo5 3 21
-2 processo6 3 21
-2 processo7 3 21
-2 processo8 3 21
-2 processo9 3 21
-2 processo10 1 21
-2 processo11 3 21
+1 A 2 11
+2 B 2 5
+2 C 2 4
+2 D 2 3
+2 E 2 21
+2 F 3 21
+2 G 3 21
+2 H 3 21
+2 I 3 21
+2 J 3 21
+2 K 1 21
+2 L 3 21
 
 
 
