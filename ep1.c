@@ -97,7 +97,7 @@ int main(int argc, char *argv[])
 
     /* numero de processadores */
     numProcs = get_nprocs();
-    /* DEPURACAO */ printf("NUMERO de Processados: %d\n", numProcs);
+    /* DEPURACAO * printf("NUMERO de Processados: %d\n", numProcs);*/
 
 
     /* inicializamos o vetor de processadores e os semaforos */
@@ -115,7 +115,7 @@ int main(int argc, char *argv[])
     switch(numeroMetodoEscalonamento)
     {
       case 1:
-        /* DEPURACAO */printf("vai comecar a FCFS\n");
+        /* DEPURACAO *printf("vai comecar a FCFS\n");*/
         firstComeFirstServed(listaProcessos); break;
 
       case 2:
@@ -140,7 +140,7 @@ int main(int argc, char *argv[])
     fprintf(saida, "\n");
     fclose(saida); 
 
-    fprintf(stderr, "Quantidade de mudanças de contexto: %d\n", quantMudancasContexto);
+     if(d) fprintf(stderr, "Quantidade de mudanças de contexto: %d\n", quantMudancasContexto);
   }
 
   return 0;
@@ -215,8 +215,8 @@ void firstComeFirstServed(Processo *listaProcessos)
 
   /* atualizar a lista para o proximo elemento */
   copiaDaLista = listaProcessos->prox;
-  /* DEPURACAO */ printf("LISTA DEVERIA ESTAR SEM O ELEMENTO 0\n"); imprimeTodosProcs(copiaDaLista);
-  /* DEPURACAO */ printf("AQUI DEVERIA ESTAR O ELEMRNTO Q FOI TIRADO: nome %s\n", elementoAnalisado->nome);
+  /* DEPURACAO *printf("LISTA DEVERIA ESTAR SEM O ELEMENTO 0\n"); imprimeTodosProcs(copiaDaLista); */
+  /* DEPURACAO  printf("AQUI DEVERIA ESTAR O ELEMRNTO Q FOI TIRADO: nome %s\n", elementoAnalisado->nome); */
   /*listaProcessos = copiaDaLista;*/
   pthread_mutex_unlock(&naoPodeAcessarProcessos);
 
@@ -224,7 +224,7 @@ void firstComeFirstServed(Processo *listaProcessos)
   contadorLinhaTrace++;
   if(d) fprintf(stderr, "Chegada do processo: %s - na linha %d do trace\n", elementoAnalisado->nome, contadorLinhaTrace);
 
-  /* DEPIRACAO */ printf("VAos entrar no lopp FCFS\n");
+  /* DEPIRACAO * printf("VAos entrar no lopp FCFS\n"); */
   while(elementoAnalisado != NULL)
   {
     /* Enquanto o t0 do processo nao entra o sistema espera por isso */
@@ -243,7 +243,7 @@ void firstComeFirstServed(Processo *listaProcessos)
     /* sinalizamos que o processador esta sendo usado */
     pthread_mutex_lock(&processadoresSendoUsados[threadID]);
     flagProcessadoresEmUso[threadID] =  EM_USO;
-    /* DEPRICAO */ printf("Processador %d esta em uso, rodando agora o processo: %s\n", threadID, elementoAnalisado->nome);
+    /* DEPRICAO * printf("Processador %d esta em uso, rodando agora o processo: %s\n", threadID, elementoAnalisado->nome);*/
     pthread_mutex_unlock(&processadoresSendoUsados[threadID]);
 
     /* usaremos a variavel t0 agora para guardar a ID da thread - e nao mais o tempo inicial */
