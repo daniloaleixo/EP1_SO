@@ -43,15 +43,14 @@ void shortest_remaining_time_next();
 void escalonamento_multiplas_filas();
 
 /* funcoes auxliares*/
-float tempo_decorrido();
+void imprime_todos_procs();
 Processo *ordenar_metodo2(Processo *lista);
 Processo *retira_primeiro_elemento_da_lista();
-void imprime_todos_procs();
 Processo *interpreta_entrada(char *nome_arquivo);
-Processo *copia_lista(Processo *lista);
-Processo* sorted_merge(Processo* a, Processo* b, int mode);
-void front_back_split(Processo* source, Processo** frontRef, Processo** backRef);
-void merge_sort(Processo** headRef, int mode);
+Processo *sorted_merge(Processo *a, Processo *b, int mode);
+void front_back_split(Processo *source, Processo **frontRef,
+                      Processo **backRef);
+void merge_sort(Processo **headRef, int mode);
 int compare(Processo *a, Processo *b, int mode);
 /*------------------------------*/
 
@@ -61,7 +60,6 @@ pthread_mutex_t semaforo_lista_processos = PTHREAD_MUTEX_INITIALIZER,
                 *semaforo_processador;
 pthread_t *threads;
 FILE *arquivo_saida;
-struct timeval tempo_inicial;
 int num_procs = 0, depurar = FALSE, linha_arquivo_saida = 0,
     qtde_mudancas_contexto = 0, *estado_processador;
 
@@ -71,8 +69,7 @@ int main(int argc, char *argv[])
   int i;
   char *nome_saida;
   
-  /* inicializa contador de tempo */
-  gettimeofday(&tempo_inicial, NULL);
+  inicializa_relogio();
 
   if(argc >= 4)
   {
@@ -240,18 +237,6 @@ void escalonamento_multiplas_filas(Processo *lista)
                 funcoes auxiliares 
 
   ***************************************** */
-float tempo_decorrido()
-{
-  struct timeval tempo_atual;
-  gettimeofday(&tempo_atual, NULL);
-  if(tempo_atual.tv_usec < tempo_inicial.tv_usec)
-  {
-    tempo_atual.tv_usec += 1000000;
-    tempo_atual.tv_sec -= 1;
-  }
-  return tempo_atual.tv_sec - tempo_inicial.tv_sec +
-         (tempo_atual.tv_usec - tempo_inicial.tv_usec)/1e6;
-}
 
 Processo *retira_primeiro_elemento_da_lista()
 {
@@ -268,18 +253,6 @@ Processo *ordenar_metodo2(Processo *lista)
   return lista;
 }
 
-/* retirar da lista */
-Processo *retirar_lista(Processo *lista)
-{
-  Processo *result = lista;
-  if(lista != NULL)
-    lista = lista->prox;
-  else
-    return NULL;
-  result->prox = NULL;
-  return result;
-}
-
 /* imprime todos os processos da lista encadeada de processos */
 void imprime_todos_procs(Processo *process)
 {
@@ -289,8 +262,8 @@ void imprime_todos_procs(Processo *process)
 
   for(aux = process; (aux != NULL); aux = aux->prox)
   {
-    if((i++ != 0) && (aux == inicial) ) break;
-    printf("%s\n",aux->nome);
+    if((i++ != 0) && (aux == inicial)) break;
+    printf("%s\n", aux->nome);
   }
 }
 
@@ -330,38 +303,8 @@ Processo *interpreta_entrada(char *nome_arquivo)
   return lista;
 }
 
-Processo *copia_lista(Processo *lista)
-{
-  Processo *aux, *x, *copia, *ant;
-
-  x = malloc_safe(sizeof(Processo));
-  x->t0 = lista->t0;
-  x->nome = lista->nome;
-  x->dt = lista->dt;
-  x->deadline = lista->deadline;
-  x->prox = lista->prox;
-  copia = x;
-  ant = x;
-
-  for(aux = lista->prox; aux != NULL; aux = aux->prox)
-  {
-
-    x = malloc_safe(sizeof(Processo));
-    ant->prox = x;
-    x->t0 = aux->t0;
-    x->nome = aux->nome;
-    x->dt = aux->dt;
-    x->deadline = aux->deadline;
-    ant = x;
-
-  }
-
-  return copia;
-}
-
-/*          MERGE SORT
-
-FONTE: http://www.geeksforgeeks.org/merge-sort-for-linked-list/
+/* MERGE SORT
+   FONTE: http://www.geeksforgeeks.org/merge-sort-for-linked-list/
 */
  
 /* sorts the linked list by changing next pointers (not data) */
@@ -370,15 +313,9 @@ void merge_sort(Processo** headRef, int mode)
   Processo* head = *headRef;
   Processo* a;
   Processo* b;
- 
 
-  /*printf("head: %p\n", head);*/
   /* Base case -- length 0 or 1 */
-  if ((head == NULL) || (head->prox == NULL))
-  {
-    return;
-  }
-  /*printf("passei\n");*/
+  if((head == NULL) || (head->prox == NULL)) return;
  
   /* Split head into 'a' and 'b' sublists */
   front_back_split(head, &a, &b);
@@ -398,13 +335,13 @@ Processo* sorted_merge(Processo* a, Processo* b, int mode)
   Processo* result = NULL;
  
   /* Base cases */
-  if (a == NULL)
+  if(a == NULL)
      return(b);
-  else if (b==NULL)
+  else if(b==NULL)
      return(a);
  
   /* Pick either a or b, and recur */
-  if (compare(a, b, mode))
+  if(compare(a, b, mode))
   {
      result = a;
      result->prox = sorted_merge(a->prox, b, mode);
