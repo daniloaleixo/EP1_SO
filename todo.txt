@@ -1,2 +1,9 @@
 Temos que melhorar a função **split (por exemplo, colocar o 32 numa constante)
 
+COmo fazer o SRTN:
+- Precisamos ter 3 filas:
+	- Nossa fila de processos vai signicar os processos que nao entraram no SO ainda, e que estao esperando o seu t0 para entrarem
+	- A fila de processos em espera, quando o processo precisa ser executado mas os processadores estao cheios
+	- Fila de processos executando
+
+- Quando der o t0 de algum processo (ou seja, o processo entrar no SO), vamos retirar todos os processos que estao executando, colocar na fila de processos em espera (atualizar os valores de dt) e em seguida ordenar a fila por SRT, depois colocar os processos de novo pra rodar.
