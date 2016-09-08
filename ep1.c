@@ -254,17 +254,11 @@ Processo *ordenar_metodo2(Processo *lista)
 }
 
 /* imprime todos os processos da lista encadeada de processos */
-void imprime_todos_procs(Processo *process)
+void imprime_todos_procs()
 {
-  Processo *aux, *inicial;
-  inicial = process;
-  int i = 0;
-
-  for(aux = process; (aux != NULL); aux = aux->prox)
-  {
-    if((i++ != 0) && (aux == inicial)) break;
-    printf("%s\n", aux->nome);
-  }
+  Processo *proc;
+  for(proc = lista_processos; proc != NULL; proc = proc->prox)
+    printf("%s\n", proc->nome);
 }
 
 /* le o arquivo de entrada (trace) e devolve uma lista ligada de processos */
