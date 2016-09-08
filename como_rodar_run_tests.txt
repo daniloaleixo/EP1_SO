@@ -1,0 +1,7 @@
+Exemplo:
+
+python run_tests.py poucosProcessos/		 arqs_saida/ 		arqs_result/ 
+		    
+
+		pasta com processos 		saida do programa	quantas deadlines
+
