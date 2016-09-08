@@ -66,6 +66,7 @@ struct timeval tempoInicial;
 char d = 0;
 int contadorLinhaSaida = 0;
 int quantMudancasContexto = 0;
+int naoCumpriuDeadline = 0;
 
 
 int main(int argc, char *argv[])
@@ -142,6 +143,7 @@ int main(int argc, char *argv[])
 
      if(d) fprintf(stderr, "Quantidade de mudanças de contexto: %d\n", quantMudancasContexto);
   }
+  /* DEPURACAO */ printf("%d\n", naoCumpriuDeadline);
 
   return 0;
 }
@@ -177,6 +179,8 @@ void *thread_function(Processo *arg)
   contadorLinhaSaida++;
   if(d) fprintf(stderr, "O processo %s terminou e esta na linha %d do arquivo de saida\n", arg->nome, contadorLinhaSaida);
   pthread_mutex_unlock(&semafArqSaida);
+
+  if(calcularTempoDecorrido() > arg->deadline) naoCumpriuDeadline++;
 
 
   pthread_mutex_lock(&processadoresSendoUsados[(int) arg->t0]);
