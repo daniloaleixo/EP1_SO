@@ -19,5 +19,5 @@ FILE *cria_arquivo(char *nome);
 void *malloc_safe(size_t n);
 
 struct timeval tempo_inicial;
-float tempo_decorrido();
 void inicializa_relogio();
+float tempo_decorrido();

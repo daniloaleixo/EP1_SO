@@ -50,6 +50,10 @@ void *malloc_safe(size_t n)
   return pt;
 }
 
+void inicializa_relogio() {
+  gettimeofday(&tempo_inicial, NULL);
+}
+
 float tempo_decorrido()
 {
   struct timeval tempo_atual;
@@ -61,8 +65,4 @@ float tempo_decorrido()
   }
   return tempo_atual.tv_sec - tempo_inicial.tv_sec +
          (tempo_atual.tv_usec - tempo_inicial.tv_usec)/1e6;
-}
-
-void inicializa_relogio() {
-  gettimeofday(&tempo_inicial, NULL);
 }
