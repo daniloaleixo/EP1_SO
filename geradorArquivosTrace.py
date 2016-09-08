@@ -22,6 +22,7 @@ if len(sys.argv) < 2:
 	print "-N\tnumero de processos de cada arquivo de trace"
 	print "-p\tprocessos gerados por segundo"
 	print "-l\tquanto tempo um processo pode durar no maximo"
+	print "-c\tcomecaa a criar arquivo a partir dessa posicao. Ex: -c 2 / primeiro arquivo sera arquivoTrace2.txt"
 	print "-d\tproporcao deadline em relacao ao dt do processo"
 	print "\n"
 	exit(0)
@@ -47,15 +48,21 @@ if len(sys.argv) > 2:
 		if sys.argv[tamanho - 1] == '-d':
 			proporcao_deadline = sys.argv[tamanho]
 			tamanho = tamanho - 2
+		if sys.argv[tamanho - 1] == '-c':
+			count = sys.argv[tamanho]
+			tamanho = tamanho - 2
 
 # se nao tem o dirretorio cria
-if not os.path.exists(directory):
-	os.makedirs(directory)
+if directory != '-n':
+	if not os.path.exists(directory):
+		os.makedirs(directory)
 
 #gera os aqruivos de trace
 for arq_i in range(0, int(n_arquivos_trace)):
 	tempo = 0
-	file = open(directory + "arquivoTrace" + str(arq_i) + ".txt", "w")
+
+	if directory == '-n': file = open("arquivoTrace" + str(int(arq_i) + int(count)) + ".txt", "w")
+	else: file = open(directory + "/arquivoTrace" + str(int(arq_i) + int(count)) + ".txt", "w")
 	for proc_i in range(0, int(n_processos_por_arquivo)):
 		if proc_i != 0 and proc_i % int(processos_gerados_por_segundo) == 0:
 			tempo = tempo + 1
