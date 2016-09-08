@@ -1,2 +1,0 @@
-0 processo0 2 10
-1 processo1 2 10

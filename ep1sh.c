@@ -10,21 +10,25 @@
 
 ********************************** */
 
-#include "StringOps.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
 #include <readline/readline.h>
 #include <readline/history.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
 
-#define MAX_SIZE_DIR 128
+#define MAX_SIZE_DIR 256
 #define MAX_ARGUMENTOS 15
 
 int main(int argc, char *argv[])
 {
-  char *comando, *token, **argv_chamada, *temp[MAX_ARGUMENTOS],
-        dir[MAX_SIZE_DIR], prefixo[MAX_SIZE_DIR + 3];
+  char *linha_de_comando, *comando, *argumento[MAX_ARGUMENTOS],
+       dir[MAX_SIZE_DIR], prefixo[MAX_SIZE_DIR + 3];
+  int conta_args;
+  long int permissao;
   pid_t pid;
-  int i, conta_tokens;
 
   while(1)
   {
@@ -32,55 +36,46 @@ int main(int argc, char *argv[])
     strcpy(prefixo, "(");
     strcat(prefixo, dir);
     strcat(prefixo, "): ");
+    linha_de_comando = readline(prefixo);
+    if(strcmp(linha_de_comando, "") == 0) continue;
+    add_history(linha_de_comando);
+    comando = strtok(linha_de_comando, " ");
 
-    comando = readline(prefixo);
-    
-    if(strcmp(comando, ""))
+    if(strcmp(comando, "exit") == 0)
+      break;
+    else if(strcmp(comando, "chmod") == 0)
     {
-      add_history(comando);
-      /* pega o primeiro token do comando */
-      token = strtok(comando, " ");
+      permissao = strtol(strtok(NULL, " "), 0, 8);
+      chmod(strtok(NULL, " "), permissao);
+    }
+    else if(strcmp(comando, "id") == 0)
+    {
+      if(strcmp(strtok(NULL, " "), "-u") == 0)
+        printf("%d\n", getuid());
     }
     else
-      token = "";
-
-    /* depuracao printf(">>>>%s\n", comando); */
-
-    if(strcmp(token, "pwd") == 0)
     {
-      /* chamada de sistema para pegar o diretorio atual */
-      getcwd(dir, MAX_SIZE_DIR);
-      printf("%s\n", dir);
-    }
-    else if(strcmp(token, "cd") == 0){
-      chdir(strtok(NULL, " "));
-    }
-    else if(strcmp(token, "exit") == 0) break;
-    else if(strcmp(token, "") != 0)
-    {
-      if((pid = fork()) < 0) {
+      if((pid = fork()) < 0)
+      {
         perror("falha na criação de processo!");
         exit(1);
-      } else if(pid == 0) {
-        for(conta_tokens = 0; token != NULL; conta_tokens++) {
-          temp[conta_tokens] = token;
-          token = strtok(NULL, " ");
-        }
-        argv_chamada = mallocSafe((conta_tokens + 1) * sizeof(char *));
-        
-        for(i = 0; i < conta_tokens; i++)
-          argv_chamada[i] = temp[i];
-        argv_chamada[i] = NULL;
+      }
+      else if(pid == 0)
+      {
+        argumento[0] = comando;
+        conta_args = 1;
+        while(argumento[conta_args - 1] != NULL && conta_args < MAX_ARGUMENTOS)
+          argumento[conta_args++] = strtok(NULL, " ");
 
-        if(execve(argv_chamada[0], argv_chamada, NULL) == -1) {
+        if(execve(argumento[0], argumento, NULL) == -1)
+        { 
           printf("falha no execve!\n");
           exit(1);
         }
-      } else {
-        waitpid(pid, NULL, 0);
       }
+      else waitpid(pid, NULL, 0);
     }
   }
-  free(comando);
+  free(linha_de_comando);
   return 0;
 }
