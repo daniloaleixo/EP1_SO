@@ -10,7 +10,10 @@
 
 ********************************** */
 
-#include "StringOps.h"
+#include "auxiliares.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
 #include <pthread.h>
 #include <sys/sysinfo.h>
 #include <time.h>
@@ -21,175 +24,152 @@
 #define TRUE 1
 #define FALSE 0
 
-
 typedef struct processo {
-  float t0; /*instante de tempo que o processo chega no sistema */
-  char *nome; /* nome do processo */
-  float dt; /* quanto tempo real da CPU deve ser simulado */
-  float deadline; /* instante de tempo antes que o processo precisa terminar */
+  double t0;
+  char *nome;
+  double dt; /* quanto tempo real da CPU deve ser simulado */
+  double deadline;
+  double tp; /* quanto tempo real de CPU o processo já consumiu */
+  int processador;
+  int linha_no_arquivo_trace;
   struct processo *prox;
 } Processo;
 
 /* funcoes de threads */
-void *thread_function(Processo *arg);
+void *thread_function(void *arg);
 
 /* funcoes de escalonamento */
-void firstComeFirstServed(Processo *lista);
-//void shortestJobFirst(Processo *lista);
-void shortestRemainTimeNext(Processo *lista);
-//void roundRobin(Processo *lista);
-//void escalonamentoPrioridade(Processo *lista);
+void first_come_first_served();
+void shortest_remaining_time_next();
+void escalonamento_multiplas_filas();
 
 /* funcoes auxliares*/
-float calcularTempoDecorrido();
-Processo *ordenarMetodo1(Processo *lista);
-Processo *ordenarMetodo2(Processo *lista);
-Processo *retiraPrimeiroElementoDaLista(Processo *lista);
-void imprimeTodosProcs();
-Processo *interpretaEntrada(FILE *entrada);
-Processo *copiaLista(Processo *lista);
-Processo* SortedMerge(Processo* a, Processo* b, int mode);
-void FrontBackSplit(Processo* source,Processo** frontRef, Processo** backRef);
-void MergeSort(Processo** headRef, int mode);
+void imprime_todos_procs();
+Processo *ordenar_metodo2(Processo *lista);
+Processo *retira_primeiro_elemento_da_lista();
+Processo *interpreta_entrada(char *nome_arquivo);
+Processo *sorted_merge(Processo *a, Processo *b, int mode);
+void front_back_split(Processo *source, Processo **frontRef,
+                      Processo **backRef);
+void merge_sort(Processo **headRef, int mode);
 int compare(Processo *a, Processo *b, int mode);
 /*------------------------------*/
 
-int numeroMetodoEscalonamento = 0, numProcs = 0;
-pthread_mutex_t naoPodeAcessarProcessos = PTHREAD_MUTEX_INITIALIZER;
-pthread_mutex_t *processadoresSendoUsados;
-pthread_mutex_t semafArqSaida = PTHREAD_MUTEX_INITIALIZER;
-int *flagProcessadoresEmUso;
-Processo *listaProcessos;
+Processo *lista_processos, *processos_em_execucao;
+pthread_mutex_t semaforo_lista_processos = PTHREAD_MUTEX_INITIALIZER,
+                semaforo_arq_saida = PTHREAD_MUTEX_INITIALIZER,
+                *semaforo_processador;
 pthread_t *threads;
-FILE *saida;
-struct timeval tempoInicial;
-char d = 0;
-int contadorLinhaSaida = 0;
-int quantMudancasContexto = 0;
-int naoCumpriuDeadline = 0;
+FILE *arquivo_saida;
+int num_procs = 0, depurar = FALSE, linha_arquivo_saida = 0,
+    qtde_mudancas_contexto = 0, *estado_processador,
+    contador_deadlines_estourados = 0;
 
 
 int main(int argc, char *argv[])
 {
   int i;
-  FILE *trace; 
-  char *nomeSaida;
-  float tempoDecorrido;
+  char *nome_saida;
   
-  /* inicializa contador de tempo */
-  gettimeofday(&tempoInicial, NULL);
-  tempoDecorrido = calcularTempoDecorrido();
+  inicializa_relogio();
 
-  /* verifica a quant de argumentos se esta correta */
-  if(argc == 4 || argc == 5 )
+  if(argc >= 4)
   {
+    depurar = (argc == 5 && strcmp(argv[4], "d") == 0);
 
-    if(argc == 5)
-    {
-      if(argv[4][0] == 'd')
-        d = TRUE;
-    }
+    /* le o arquivo de trace da entrada e coloca todos os processos numa
+       lista encadeada (lista_processos) */
+    lista_processos = interpreta_entrada(argv[2]);
 
-    /* pega os parametros */
-    numeroMetodoEscalonamento = atoi(argv[1]);
-    trace = leEntrada(argv[2]);
-    nomeSaida = argv[3];
-    saida = criaArquivo(nomeSaida);
+    nome_saida = argv[3];
+    arquivo_saida = cria_arquivo(nome_saida);
 
-    /* numero de processadores */
-    numProcs = get_nprocs();
-    /* DEPURACAO * printf("NUMERO de Processados: %d\n", numProcs);*/
-
-
-    /* inicializamos o vetor de processadores e os semaforos */
-    flagProcessadoresEmUso = mallocSafe(numProcs * sizeof(int));
-    for(i = 0; i < numProcs; i++)
-      flagProcessadoresEmUso[i] = LIVRE;
-    processadoresSendoUsados = mallocSafe(numProcs * sizeof(pthread_mutex_t));
-    threads = mallocSafe(numProcs * sizeof(pthread_t));
-
-    /* pega o processo do arquivo de texto e coloca em uma struct */
-    listaProcessos = interpretaEntrada(trace);
-    /* DEPURACAO *printf("ANTES DA ORDENACAO\n"); imprimeTodosProcs(listaProcessos); */
+    /* pega o numero de processadores e aloca um vetor de inteiros para
+       guardar o estado atual (EM_USO ou LIVRE) de cada processador,
+       alem de alocar um vetor de semaforos (um por processador) e um vetor de
+       threads (uma por processador) */
+    num_procs = get_nprocs();
+    estado_processador = malloc_safe(num_procs * sizeof(int));
+    for(i = 0; i < num_procs; i++)
+      estado_processador[i] = LIVRE;
+    semaforo_processador = malloc_safe(num_procs * sizeof(pthread_mutex_t));
+    threads = malloc_safe(num_procs * sizeof(pthread_t));
 
     /* escolhe o metodo de escalonamento */
-    switch(numeroMetodoEscalonamento)
+    switch(atoi(argv[1]))
     {
       case 1:
-        /* DEPURACAO *printf("vai comecar a FCFS\n");*/
-        firstComeFirstServed(listaProcessos); break;
+        first_come_first_served();
+        break;
 
       case 2:
-        shortestRemainTimeNext(listaProcessos); break;
+        shortest_remaining_time_next(lista_processos);
+        break;
 
-      case 3: break;
-        //Multilpas filas
+      case 3:
+        escalonamento_multiplas_filas(lista_processos);
+        break;
     }
-  } else
-  {
-    printf("\nArgumentos incorretos\n");
-    printf("Modo de utilizacao: \n\n");
-    printf("ep1 <numero do Metodo de Escalonamento> <arquivo de entrada> <arquivo de saida>\n\n");
   }
+  else
+    printf("Argumentos incorretos. Modo de utilizacao:\n\n"
+           "\tep1 <numero do Metodo de Escalonamento> <arquivo de entrada> "
+           "<arquivo de saida>\n\n");
 
-  /* esperar as threads liberarem */
-  if(numProcs != 0)
+  /* espera ate que todos os processadores estejam LIVREs (ou seja, espera
+     que todas as threads terminem a execucao) */
+  if(num_procs != 0)
   {  
-    for(i = 0; i < numProcs; i++)
-      if(flagProcessadoresEmUso[i] == EM_USO) i = 0;
+    for(i = 0; i < num_procs; i++)
+      if(estado_processador[i] == EM_USO) i = 0;
     
-    fprintf(saida, "\n");
-    fclose(saida); 
+    fprintf(arquivo_saida, "\n");
+    fclose(arquivo_saida);
 
-     if(d) fprintf(stderr, "Quantidade de mudanças de contexto: %d\n", quantMudancasContexto);
+    if(depurar)
+      fprintf(stderr, "Quantidade de mudanças de contexto: %d\n",
+              qtde_mudancas_contexto);
   }
-  /* DEPURACAO */ printf("%d\n", naoCumpriuDeadline);
+  /* DEPURACAO */ printf("%d\n", contador_deadlines_estourados);
 
   return 0;
 }
 
-/* *****************************************
-
-            funcoes de threads
-
-  ***************************************** */
-
-void *thread_function(Processo *arg)
+void *thread_function(void *arg)
 {
+  float t0_processo = tempo_decorrido(),
+        tempo_decorrido_processo = 0;
   int i;
-  float tempoInicialProcesso, tempoDecorridoProcesso;
-  
-  tempoInicialProcesso = calcularTempoDecorrido();
+  Processo *proc = (Processo *) arg;
 
-  if(d) fprintf(stderr, "O processo %s esta usando a CPU: %d\n", arg->nome, (int) arg->t0);
+  if(depurar)
+    fprintf(stderr, "%8.4fs | O processo %s esta usando a CPU: %d\n",
+            tempo_decorrido(), proc->nome, proc->processador);
 
-
-  while((tempoDecorridoProcesso = calcularTempoDecorrido() - tempoInicialProcesso) < arg->dt)
+  while(tempo_decorrido_processo < proc->dt)
   {
-    i += 1;
-    i = i % 100000;
+    tempo_decorrido_processo = tempo_decorrido() - t0_processo;
+    i = (i + 1) % 100000;
   }
 
-  pthread_mutex_lock(&semafArqSaida);
-  /* imprime o nome do processo no arquivo saida*/
-  fprintf(saida, "%s", arg->nome);
-  /* imprime o tf e o tr no arquivo */
-  fprintf(saida, " %f", calcularTempoDecorrido());
-  fprintf(saida, " %f\n", tempoDecorridoProcesso);
-  contadorLinhaSaida++;
-  if(d) fprintf(stderr, "O processo %s terminou e esta na linha %d do arquivo de saida\n", arg->nome, contadorLinhaSaida);
-  pthread_mutex_unlock(&semafArqSaida);
+  pthread_mutex_lock(&semaforo_arq_saida);
+  fprintf(arquivo_saida, "%s %f %f\n",
+          proc->nome, tempo_decorrido(), tempo_decorrido_processo);
+  if(depurar)
+    fprintf(stderr, "%8.4fs | O processo %s terminou e esta na linha %d do "
+                    "arquivo de saida\n", tempo_decorrido(), proc->nome,
+                    ++linha_arquivo_saida);
+  pthread_mutex_unlock(&semaforo_arq_saida);
 
-  if(calcularTempoDecorrido() > arg->deadline) naoCumpriuDeadline++;
+  if(tempo_decorrido() > proc->deadline) contador_deadlines_estourados++;
 
+  pthread_mutex_lock(&semaforo_processador[proc->processador]);
+  estado_processador[proc->processador] = LIVRE;
+  pthread_mutex_unlock(&semaforo_processador[proc->processador]);
 
-  pthread_mutex_lock(&processadoresSendoUsados[(int) arg->t0]);
-  flagProcessadoresEmUso[(int) arg->t0] = LIVRE;
-  pthread_mutex_unlock(&processadoresSendoUsados[(int) arg->t0]);
-
-  if(d) fprintf(stderr, "O processo %s esta deixando a CPU: %d\n", arg->nome, (int) arg->t0);
-
-  tempoDecorridoProcesso = calcularTempoDecorrido();
+  if(depurar)
+    fprintf(stderr, "%8.4fs | O processo %s esta deixando a CPU: %d\n",
+            tempo_decorrido(), proc->nome, proc->processador);
   return NULL;
 }
 
@@ -199,89 +179,60 @@ void *thread_function(Processo *arg)
 
   ***************************************** */
 
-void firstComeFirstServed(Processo *listaProcessos)
+void first_come_first_served()
 {
-  Processo *elementoAnalisado, *copiaDaLista;
+  Processo *processo_atual;
   int i;
-  int threadID = 0;
-  int contadorLinhaTrace = 0;
 
-  listaProcessos = ordenarMetodo1(listaProcessos);
-  /* DEPURACAO * printf("DEPOIS DA ORDENACAO\n"); imprimeTodosProcs(listaProcessos);*/
+  /* pega da lista o primeiro processo */
+  pthread_mutex_lock(&semaforo_lista_processos);
+  processo_atual = retira_primeiro_elemento_da_lista();
+  pthread_mutex_unlock(&semaforo_lista_processos);
 
-  /*
-      COMEÇAR AS THREADS 
-  */
-
-  /* retirar elemento da lista */
-  pthread_mutex_lock(&naoPodeAcessarProcessos);
-  elementoAnalisado = retiraPrimeiroElementoDaLista(listaProcessos);
-
-  /* atualizar a lista para o proximo elemento */
-  copiaDaLista = listaProcessos->prox;
-  /* DEPURACAO *printf("LISTA DEVERIA ESTAR SEM O ELEMENTO 0\n"); imprimeTodosProcs(copiaDaLista); */
-  /* DEPURACAO  printf("AQUI DEVERIA ESTAR O ELEMRNTO Q FOI TIRADO: nome %s\n", elementoAnalisado->nome); */
-  /*listaProcessos = copiaDaLista;*/
-  pthread_mutex_unlock(&naoPodeAcessarProcessos);
-
-  
-  contadorLinhaTrace++;
-  if(d) fprintf(stderr, "Chegada do processo: %s - na linha %d do trace\n", elementoAnalisado->nome, contadorLinhaTrace);
-
-  /* DEPIRACAO * printf("VAos entrar no lopp FCFS\n"); */
-  while(elementoAnalisado != NULL)
+  while(processo_atual != NULL)
   {
-    /* Enquanto o t0 do processo nao entra o sistema espera por isso */
-    /* DEPURACAO* printf("elementoAnalisado - t0: %d - copiaDaLista: %s - %d\n", elementoAnalisadooSistema - tempoInicialSistema, copiaDaLista->nome, copiaDaLista->t0);*/
-    while(calcularTempoDecorrido() < elementoAnalisado->t0)
-    {
-      /* DEPURACAO printf("Estou esperando processo entrar\n"); */
-      usleep(100);
-    }
+    if(depurar)
+      fprintf(stderr, "%8.4fs | Chegada do processo %s - linha %d no trace\n",
+              tempo_decorrido(), processo_atual->nome,
+              processo_atual->linha_no_arquivo_trace);
 
-    /* procura o proximo processador disponivel */
-    for(threadID = 0; flagProcessadoresEmUso[threadID] != LIVRE; threadID = (threadID + 1) % numProcs);
+    /* Espera até que o processo chegue (t >= t0) */
+    while(tempo_decorrido() < processo_atual->t0) usleep(100);
+
+    /* procura um processador disponivel */
+    for(i = 0; estado_processador[i] != LIVRE; i = (i + 1) % num_procs);
        
+    /* marca o processador encontrado como EM_USO e, no processo a ser rodado,
+       o processador que ele está usando como i+1 */
+    pthread_mutex_lock(&semaforo_processador[i]);
+    estado_processador[i] = EM_USO;
+    processo_atual->processador = i + 1;
+    pthread_mutex_unlock(&semaforo_processador[i]);
 
-    /* Criacao da thread */
-    /* sinalizamos que o processador esta sendo usado */
-    pthread_mutex_lock(&processadoresSendoUsados[threadID]);
-    flagProcessadoresEmUso[threadID] =  EM_USO;
-    /* DEPRICAO * printf("Processador %d esta em uso, rodando agora o processo: %s\n", threadID, elementoAnalisado->nome);*/
-    pthread_mutex_unlock(&processadoresSendoUsados[threadID]);
-
-    /* usaremos a variavel t0 agora para guardar a ID da thread - e nao mais o tempo inicial */
-    elementoAnalisado->t0 = threadID;
-    /* criamos a thread de fato e comecamos a executar na funcao thread_function */
-    if(pthread_create(&threads[threadID], NULL, thread_function, elementoAnalisado))
+    /* cria uma thread para o processo_atual e roda ela durante
+       processo_atual->dt segundos (com consumo de CPU) */
+    if(pthread_create(&threads[i], NULL, thread_function, processo_atual))
     {
-      printf("error creating thread.");
+      printf("Erro na criacao da thread.\n");
       abort();
     }
 
-    /* 
-        volta a tirar um elemento da lista pra manter a condição de loop 
-    */
-    pthread_mutex_lock(&naoPodeAcessarProcessos);
-    /* retirar elemento da lista*/
-    if(copiaDaLista != NULL)
-    {
-      elementoAnalisado = retiraPrimeiroElementoDaLista(copiaDaLista);
-      copiaDaLista = copiaDaLista->prox;
-
-      contadorLinhaTrace++;
-      if(d) fprintf(stderr, "Chegada do processo: %s - na linha %d do trace\n", elementoAnalisado->nome, contadorLinhaTrace);
-    }
-    else elementoAnalisado = NULL;
-    pthread_mutex_unlock(&naoPodeAcessarProcessos);
+    /* tira o proximo processo da lista */
+    pthread_mutex_lock(&semaforo_lista_processos);
+    processo_atual = retira_primeiro_elemento_da_lista();
+    pthread_mutex_unlock(&semaforo_lista_processos);
   }
 }
 
-
-void shortestRemainTimeNext(Processo *lista)
+void shortest_remaining_time_next(Processo *lista)
 {
-  lista = ordenarMetodo1(lista);
-  MergeSort(&lista, 3);
+  merge_sort(&lista, 3);
+  /*return lista;*/
+}
+
+void escalonamento_multiplas_filas(Processo *lista)
+{
+  merge_sort(&lista, 5);
   /*return lista;*/
 }
 
@@ -290,232 +241,113 @@ void shortestRemainTimeNext(Processo *lista)
                 funcoes auxiliares 
 
   ***************************************** */
-float calcularTempoDecorrido()
+
+Processo *retira_primeiro_elemento_da_lista()
 {
-  struct timeval tempoAtual;
-  gettimeofday(&tempoAtual, NULL);
-  if(tempoAtual.tv_usec < tempoInicial.tv_usec)
-  {
-    tempoAtual.tv_usec += 1000000;
-    tempoAtual.tv_sec -= 1;
-  }
-  return (float)((tempoAtual.tv_sec - tempoInicial.tv_sec) + ((float)(tempoAtual.tv_usec - tempoInicial.tv_usec)/1e6));;
+  if(lista_processos == NULL) return NULL;
+  Processo *elemento = lista_processos;
+  lista_processos = lista_processos->prox;
+  elemento->prox = NULL;
+  return elemento;
 }
 
-Processo *ordenarMetodo1(Processo *lista)
+Processo *ordenar_metodo2(Processo *lista)
 {
-  Processo *t, *y, *r;
-  y = lista;
-  r = NULL;
-
-  /* colocar a lista pela ordem do arquivo */
-  while (y != NULL)
-  {
-    t = y->prox; 
-    y->prox = r; 
-    r = y; 
-    y = t; 
-  }
-  return r;   
-}
-
-Processo *ordenarMetodo2(Processo *lista)
-{
-  MergeSort(&lista, 2);
+  merge_sort(&lista, 2);
   return lista;
 }
 
-/* retirar da lista */
-Processo *retiraPrimeiroElementoDaLista(Processo *lista)
-{
-  Processo *result = mallocSafe(sizeof(Processo));
-
-  if(lista != NULL){
-    result->t0 = lista->t0;
-    result->nome = lista->nome;
-    result->dt = lista->dt;
-    result->deadline = lista->deadline;
-  }
-  else
-    return NULL;
-
-  /* DEPURACAO printf("Retornando funcao que retira elemento result->nome: %s\n",result->nome );*/
-  
-
-  result->prox = NULL;
-  return result;
-}
-
 /* imprime todos os processos da lista encadeada de processos */
-void imprimeTodosProcs(Processo *process)
+void imprime_todos_procs()
 {
-  Processo *aux, *inicial;
-  inicial = process;
-  int i = 0;
-
-  for(aux = process; (aux != NULL); aux = aux->prox)
-  {
-    if((i++ != 0) && (aux == inicial) ) break;
-    printf("nome: %s, t0: %f, dt: %f, deadline: %f\n",aux->nome, aux->t0, aux->dt, aux->deadline);
-  }
+  Processo *proc;
+  for(proc = lista_processos; proc != NULL; proc = proc->prox)
+    printf("%s\n", proc->nome);
 }
 
-
-
-/* a funcao pega a linha com o processo e suas infos do arquivo de texto
-  e retorna o struct processo com todas as infos */
-Processo *interpretaEntrada(FILE *entrada)
+/* le o arquivo de entrada (trace) e devolve uma lista ligada de processos */
+Processo *interpreta_entrada(char *nome_arquivo)
 {
-  char *linha;
-  char **palavras;
-  int tamanholinha;
-  int i = 0;
-  Processo *ant, *x;
+  Processo *lista, *proc, *novo_proc;
+  FILE *arquivo_entrada = abre_arquivo(nome_arquivo);
+  double t0;
+  int i = 1;
 
-  linha = readLine(entrada);
-  tamanholinha = strlen(linha);
-  palavras = mallocSafe(5 * sizeof(char*));
-  for(i = 0; i < 5; i++)
+  proc = malloc_safe(sizeof(Processo));
+  lista = proc;
+
+  proc->nome = malloc_safe(64 * sizeof(char));
+  proc->processador = -1;
+  proc->linha_no_arquivo_trace = i++;
+  fscanf(arquivo_entrada,"%lf", &(proc->t0));
+  fscanf(arquivo_entrada,"%s", proc->nome);
+  fscanf(arquivo_entrada,"%lf", &(proc->dt));
+  fscanf(arquivo_entrada,"%lf", &(proc->deadline));
+
+  while(fscanf(arquivo_entrada, "%lf", &t0) == 1)
   {
-    palavras[i] = mallocSafe(32 * sizeof(char));
+    novo_proc = malloc_safe(sizeof(Processo));
+    novo_proc->nome = malloc_safe(64 * sizeof(char));
+    novo_proc->t0 = t0;
+    novo_proc->processador = -1;
+    novo_proc->linha_no_arquivo_trace = i++;
+    fscanf(arquivo_entrada,"%s", novo_proc->nome);
+    fscanf(arquivo_entrada,"%lf", &(novo_proc->dt));
+    fscanf(arquivo_entrada,"%lf", &(novo_proc->deadline));
+    proc->prox = novo_proc;
+    proc = novo_proc;
   }
-  x = mallocSafe(sizeof(Processo));
 
-  /* split */
-  palavras = split(linha, tamanholinha, ' ', 5);
-
-  /* depuracao for(i = 0; i < 5; i++)
-  {
-    printf("%s\n", palavras[i]);
-  }*/
-
-  x->t0 = atof(palavras[0]);
-  x->nome = palavras[1];
-  x->dt = atof(palavras[2]);
-  x->deadline = atof(palavras[3]);
-  x->prox = NULL;
-
-  ant = x;
-  while((linha = readLine(entrada)) != NULL)
-  {
-    if(strlen(linha) > 5)
-    {
-      tamanholinha = strlen(linha);
-      palavras = mallocSafe(5 * sizeof(char*));
-      for(i = 0; i < 5; i++)
-      {
-        palavras[i] = mallocSafe(32 * sizeof(char));
-      }
-      x = mallocSafe(sizeof(Processo));
-
-      /* split */
-      palavras = split(linha, tamanholinha, ' ', 5);
-
-      /* depuracao * for(i = 0; i < 5; i++)
-      {
-        printf("%s\n", palavras[i]);
-      }*/
-
-      x->t0 = atoi(palavras[0]);
-      x->nome = palavras[1];
-      x->dt = atoi(palavras[2]);
-      x->deadline = atoi(palavras[3]);
-      x->prox = ant;
-      ant = x;
-    }
-    
-  }
-  /* depuracao printf("%d\n", x->t0);
-  printf("%d\n", x->deadline);*/
-
-  return ant;
+  return lista;
 }
 
-Processo *copiaLista(Processo *lista)
-{
-  Processo *aux, *x, *copia, *ant;
-
-  x = mallocSafe(sizeof(Processo));
-  x->t0 = lista->t0;
-  x->nome = lista->nome;
-  x->dt = lista->dt;
-  x->deadline = lista->deadline;
-  x->prox = lista->prox;
-  copia = x;
-  ant = x;
-
-  for(aux = lista->prox; aux != NULL; aux = aux->prox)
-  {
-
-    x = mallocSafe(sizeof(Processo));
-    ant->prox = x;
-    x->t0 = aux->t0;
-    x->nome = aux->nome;
-    x->dt = aux->dt;
-    x->deadline = aux->deadline;
-    ant = x;
-
-  }
-
-  return copia;
-}
-
-
-
-/*          MERGE SORT
-
-FONTE: http://www.geeksforgeeks.org/merge-sort-for-linked-list/
+/* MERGE SORT
+   FONTE: http://www.geeksforgeeks.org/merge-sort-for-linked-list/
 */
  
 /* sorts the linked list by changing next pointers (not data) */
-void MergeSort(Processo** headRef, int mode)
+void merge_sort(Processo** headRef, int mode)
 {
   Processo* head = *headRef;
   Processo* a;
   Processo* b;
- 
 
-  /*printf("head: %p\n", head);*/
   /* Base case -- length 0 or 1 */
-  if ((head == NULL) || (head->prox == NULL))
-  {
-    return;
-  }
-  /*printf("passei\n");*/
+  if((head == NULL) || (head->prox == NULL)) return;
  
   /* Split head into 'a' and 'b' sublists */
-  FrontBackSplit(head, &a, &b);
+  front_back_split(head, &a, &b);
  
   /* Recursively sort the sublists */
-  MergeSort(&a, mode);
-  MergeSort(&b, mode);
+  merge_sort(&a, mode);
+  merge_sort(&b, mode);
  
   /* answer = merge the two sorted lists together */
-  *headRef = SortedMerge(a, b, mode);
+  *headRef = sorted_merge(a, b, mode);
 }
  
 /* See http://geeksforgeeks.org/?p=3622 for details of this
    function */
-Processo* SortedMerge(Processo* a, Processo* b, int mode)
+Processo* sorted_merge(Processo* a, Processo* b, int mode)
 {
   Processo* result = NULL;
  
   /* Base cases */
-  if (a == NULL)
+  if(a == NULL)
      return(b);
-  else if (b==NULL)
+  else if(b==NULL)
      return(a);
  
   /* Pick either a or b, and recur */
-  if (compare(a, b, mode))
+  if(compare(a, b, mode))
   {
      result = a;
-     result->prox = SortedMerge(a->prox, b, mode);
+     result->prox = sorted_merge(a->prox, b, mode);
   }
   else
   {
      result = b;
-     result->prox = SortedMerge(a, b->prox, mode);
+     result->prox = sorted_merge(a, b->prox, mode);
   }
   return(result);
 }
@@ -525,7 +357,7 @@ Processo* SortedMerge(Processo* a, Processo* b, int mode)
      and return the two lists using the reference parameters.
      If the length is odd, the extra node should go in the front list.
      Uses the fast/slow pointer strategy.  */
-void FrontBackSplit(Processo* source,
+void front_back_split(Processo* source,
           Processo** frontRef, Processo** backRef)
 {
   Processo* fast;
@@ -560,23 +392,10 @@ void FrontBackSplit(Processo* source,
   }
 }
 
-
-
 int compare(Processo *a, Processo *b, int mode)
 {
   if(mode == 2)
-  {
-    if (a->dt <= b->dt)
-      return 1;
-    else
-      return 0;
-  }
+    return (a->dt <= b->dt ? 1 : 0);
   else if(mode == 3)
-  {
-    if (a->deadline <= b->deadline)
-      return 1;
-    else
-      return 0;
-  }
-
+    return (a->deadline <= b->deadline ? 1 : 0);
 }

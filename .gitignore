@@ -3,7 +3,7 @@ runfile
 readline/
 
 # arquivos de saida
-StringOps.o
+auxiliares.o
 ep1
 ep1sh
 saida.txt

@@ -11,7 +11,10 @@
 ********************************** */
 
 
-Primeiramente basta utilizar o comando "make" para compilar os arquivos executáveis.
+Primeiramente basta utilizar o comando "make" para compilar os arquivos
+executáveis.
 O executável ep1sh é o shell conforma o item 1.1 do enunciado do EP1
-Já o executável ep1 é a parte 1.2 do enunciado, que corresponde ao escalonador de processos.
-Os dois arquivos podem ser chamados usando o comando ./ do Linux.
+Já o executável ep1 é a parte 1.2 do enunciado, que corresponde ao escalonador
+de processos.
+A chamada dos programas deve ser feita conforme especificada no enunciado (
+rode ep1sh através do seu terminal e ep1 a partir do terminal ep1sh)
