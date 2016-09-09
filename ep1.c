@@ -93,7 +93,8 @@ int main(int argc, char *argv[])
     for(i = 0; i < num_procs; i++)
       estado_processador[i] = LIVRE;
     semaforo_processador = malloc_safe(num_procs * sizeof(pthread_mutex_t));
-    for(i = 0; i < num_procs; i++) { semaforo_processador[i] = PTHREAD_MUTEX_INITIALIZER; }
+    for (i = 0; i < num_procs; i++) 
+      pthread_mutex_init(&semaforo_processador[i], NULL);
     threads = malloc_safe(num_procs * sizeof(pthread_t));
 
     /* escolhe o metodo de escalonamento */
