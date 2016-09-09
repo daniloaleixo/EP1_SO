@@ -89,6 +89,7 @@ int main(int argc, char *argv[])
        alem de alocar um vetor de semaforos (um por processador) e um vetor de
        threads (uma por processador) */
     num_procs = get_nprocs();
+    printf("num_procs: %d\n", num_procs);
     estado_processador = malloc_safe(num_procs * sizeof(int));
     for(i = 0; i < num_procs; i++)
       estado_processador[i] = LIVRE;
@@ -214,7 +215,7 @@ void first_come_first_served()
        o processador que ele está usando como i+1 */
     pthread_mutex_lock(&semaforo_processador[i]);
     estado_processador[i] = EM_USO;
-    processo_atual->processador = i + 1;
+    processo_atual->processador = i;
     pthread_mutex_unlock(&semaforo_processador[i]);
 
     /* cria uma thread para o processo_atual e roda ela durante
