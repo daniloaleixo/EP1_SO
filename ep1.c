@@ -120,8 +120,12 @@ int main(int argc, char *argv[])
      que todas as threads terminem a execucao) */
   if(num_procs != 0)
   {  
-    for(i = 0; i < num_procs; i++)
+    /*for(i = 0; i < num_procs; i++){
       if(estado_processador[i] == EM_USO) i = 0;
+	/* DEPURACAO * printf("estou em uso\n");*
+	}*/
+    for(i = 0; i < num_procs; i++)
+    	pthread_join(threads[i], NULL);
     
     fprintf(arquivo_saida, "\n");
     fclose(arquivo_saida);
