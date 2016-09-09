@@ -93,6 +93,7 @@ int main(int argc, char *argv[])
     for(i = 0; i < num_procs; i++)
       estado_processador[i] = LIVRE;
     semaforo_processador = malloc_safe(num_procs * sizeof(pthread_mutex_t));
+    for(i = 0; i < num_procs; i++) { semaforo_processador[i] = PTHREAD_MUTEX_INITIALIZER; }
     threads = malloc_safe(num_procs * sizeof(pthread_t));
 
     /* escolhe o metodo de escalonamento */
@@ -167,8 +168,10 @@ void *thread_function(void *arg)
 
   if(tempo_decorrido() > proc->deadline) contador_deadlines_estourados++;
 
+  printf("Antes de liberar a cpu: semaforo_processador %d\n",semaforo_processador[proc->processador]);
   pthread_mutex_lock(&semaforo_processador[proc->processador]);
   estado_processador[proc->processador] = LIVRE;
+
   pthread_mutex_unlock(&semaforo_processador[proc->processador]);
 
   if(depurar)
@@ -220,11 +223,12 @@ void first_come_first_served()
       printf("Erro na criacao da thread.\n");
       abort();
     }
-
+    printf("acabou a fncao da thread");
     /* tira o proximo processo da lista */
     pthread_mutex_lock(&semaforo_lista_processos);
     processo_atual = retira_primeiro_elemento_da_lista();
     pthread_mutex_unlock(&semaforo_lista_processos);
+    printf("retirei elemento da lisra\n");
   }
 }
 
