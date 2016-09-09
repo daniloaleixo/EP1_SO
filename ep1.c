@@ -29,14 +29,14 @@ typedef struct processo {
   char *nome;
   double dt; /* quanto tempo real da CPU deve ser simulado */
   double deadline;
-  double tp; /* quanto tempo real de CPU o processo já consumiu */
+  double tempo_restante; /* quanto tempo real de CPU o processo já consumiu */
   int processador;
   int linha_no_arquivo_trace;
   struct processo *prox;
 } Processo;
 
 /* funcoes de threads */
-void *thread_function(void *arg);
+void *thread_function_fcfs(void *arg);
 
 /* funcoes de escalonamento */
 void first_come_first_served();
@@ -55,15 +55,18 @@ void merge_sort(Processo **headRef, int mode);
 int compare(Processo *a, Processo *b, int mode);
 /*------------------------------*/
 
-Processo *lista_processos, *processos_em_execucao;
+Processo *lista_processos, *lista_execucao, *lista_espera;
 pthread_mutex_t semaforo_lista_processos = PTHREAD_MUTEX_INITIALIZER,
+                semaforo_lista_espera = PTHREAD_MUTEX_INITIALIZER,
+                semaforo_lista_execucao = PTHREAD_MUTEX_INITIALIZER,
                 semaforo_arq_saida = PTHREAD_MUTEX_INITIALIZER,
                 *semaforo_processador;
 pthread_t *threads;
 FILE *arquivo_saida;
 int num_procs = 0, depurar = FALSE, linha_arquivo_saida = 0,
     qtde_mudancas_contexto = 0, *estado_processador,
-    contador_deadlines_estourados = 0;
+    contador_deadlines_estourados = 0,
+    *pids_em_execucao;
 
 
 int main(int argc, char *argv[])
@@ -103,7 +106,7 @@ int main(int argc, char *argv[])
         break;
 
       case 2:
-        shortest_remaining_time_next(lista_processos);
+        shortest_remaining_time_next();
         break;
 
       case 3:
@@ -135,7 +138,7 @@ int main(int argc, char *argv[])
   return 0;
 }
 
-void *thread_function(void *arg)
+void *thread_function_fcfs(void *arg)
 {
   float t0_processo = tempo_decorrido(),
         tempo_decorrido_processo = 0;
@@ -211,7 +214,7 @@ void first_come_first_served()
 
     /* cria uma thread para o processo_atual e roda ela durante
        processo_atual->dt segundos (com consumo de CPU) */
-    if(pthread_create(&threads[i], NULL, thread_function, processo_atual))
+    if(pthread_create(&threads[i], NULL, thread_function_fcfs, processo_atual))
     {
       printf("Erro na criacao da thread.\n");
       abort();
@@ -224,8 +227,78 @@ void first_come_first_served()
   }
 }
 
+void thread_function_srtn(void *arg)
+{
+  Processo *proc = (Processo *) arg; 
+}
+
 void shortest_remaining_time_next(Processo *lista)
 {
+  int primeiro_t0, proximo_t0, i;
+  Processo *primeiro_processo, *processo_atual, *proximo_processo;
+
+  pids_em_execucao = malloc_safe(num_procs * sizeof(int));
+
+  /* pega da lista o primeiro processo */
+  pthread_mutex_lock(&semaforo_lista_processos);
+  primeiro_processo = retira_primeiro_elemento_da_lista();
+  pthread_mutex_unlock(&semaforo_lista_processos);
+
+  insere_na_lista_espera(primeiro_processo);
+  
+  /* Pegamos da lista de processos todos os processos que chegam junto com
+     o primeiro processo, inserindo todos na lista de espera */
+  primeiro_t0 = primeiro_processo->t0;
+  for(processo_atual = retira_primeiro_elemento_da_lista();
+      processo_atual->t0 <= primeiro_t0;
+      processo_atual = retira_primeiro_elemento_da_lista())
+    insere_na_lista_espera(processo_atual);
+
+  /* Espera até que o processo chegue (t >= t0) */
+  while(tempo_decorrido() < primeiro_t0) usleep(100);
+
+  /* nas linhas abaixo, se verifica quanto tempo de execucao daremos para os
+     processos */
+  proximo_processo = retira_primeiro_elemento_da_lista();
+  proximo_t0 = proximo_processo->t0;
+  tempo_de_execucao = proximo_t0 - primeiro_t0;
+
+  ordenar_fila_espera();
+  for(processo_atual = lista_espera, i = 0;
+      i < num_procs && processo_atual != NULL;
+      i++, processo_atual = processo_atual->prox)
+    if(processo_atual->tempo_restante < tempo_de_execucao)
+      tempo_de_execucao = processo_atual->tempo_restante;
+
+  for(i = 0; i < num_procs; i++)
+  {
+    processo_atual = retira_primeiro_elemento_da_lista_espera();
+    /* cria uma thread para o processo_atual e roda ela durante
+       processo_atual->dt segundos (com consumo de CPU) */
+    if(pthread_create(&threads[i], NULL, thread_function_srtn, processo_atual))
+    {
+      printf("Erro na criacao da thread.\n");
+      abort();
+    }
+    pids_em_execucao[i] = processo_atual->linha_no_arquivo_trace;
+    insere_na_lista_execucao(processo_atual);
+    processo_atual->processador = i + 1;
+  }
+
+  for(i = 0; i < num_procs; ++i) pthread_join(threads[i], NULL);
+
+  for(processo_atual = lista_espera; processo_atual->prox != NULL;
+      processo_atual = processo_atual->prox);
+
+  processo_atual->prox = lista_execucao;
+  lista_execucao = NULL;
+
+
+
+
+
+
+
   merge_sort(&lista, 3);
   /*return lista;*/
 }
@@ -283,6 +356,7 @@ Processo *interpreta_entrada(char *nome_arquivo)
   fscanf(arquivo_entrada,"%s", proc->nome);
   fscanf(arquivo_entrada,"%lf", &(proc->dt));
   fscanf(arquivo_entrada,"%lf", &(proc->deadline));
+  proc->tempo_restante = proc->dt;
 
   while(fscanf(arquivo_entrada, "%lf", &t0) == 1)
   {
@@ -294,6 +368,7 @@ Processo *interpreta_entrada(char *nome_arquivo)
     fscanf(arquivo_entrada,"%s", novo_proc->nome);
     fscanf(arquivo_entrada,"%lf", &(novo_proc->dt));
     fscanf(arquivo_entrada,"%lf", &(novo_proc->deadline));
+    novo_proc->tempo_restante = novo_proc->dt;
     proc->prox = novo_proc;
     proc = novo_proc;
   }
