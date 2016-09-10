@@ -395,7 +395,7 @@ void shortest_remaining_time_next(Processo *lista)
   if(lista_processos == NULL && lista_espera != NULL && lista_espera->prox == NULL) tempo_de_execucao = lista_espera->tempo_restante;
 
 
-  /* DEPIRACAO */ printf("tempo_de_execucao: %lf\n", tempo_de_execucao);
+  /* DEPIRACAO * printf("tempo_de_execucao: %lf\n", tempo_de_execucao);*/
 
 
   /* DEPURACAO */if(verbose) printf("Vamos executar as threads\n");
@@ -461,7 +461,7 @@ void shortest_remaining_time_next(Processo *lista)
   while(lista_espera != NULL || lista_processos != NULL)
   {
 
-    /* DEPURACAO */ printf("\n--------------------------------------------------------MAIS UMA INTERACAO\n");
+    /* DEPURACAO * printf("\n--------------------------------------------------------MAIS UMA INTERACAO\n");*/
     if(lista_processos != NULL)
     {
       /* pega da lista o primeiro processo */
@@ -526,7 +526,7 @@ void shortest_remaining_time_next(Processo *lista)
              entao executamos ele ate o fim */
     if(lista_processos == NULL && lista_espera != NULL && lista_espera->prox == NULL) tempo_de_execucao = lista_espera->tempo_restante;
 
-    /* DEPIRACAO */ printf("tempo_de_execucao: %lf\n", tempo_de_execucao);
+    /* DEPIRACAO * printf("tempo_de_execucao: %lf\n", tempo_de_execucao);*/
 
 
     /* DEPURACAO */if(verbose) printf("Vamos executar as threads\n");
