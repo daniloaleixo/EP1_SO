@@ -92,10 +92,13 @@ int main(int argc, char *argv[])
        alem de alocar um vetor de semaforos (um por processador) e um vetor de
        threads (uma por processador) */
     num_procs = get_nprocs();
+    printf("num_procs: %d\n", num_procs);
     estado_processador = malloc_safe(num_procs * sizeof(int));
     for(i = 0; i < num_procs; i++)
       estado_processador[i] = LIVRE;
     semaforo_processador = malloc_safe(num_procs * sizeof(pthread_mutex_t));
+    for (i = 0; i < num_procs; i++) 
+      pthread_mutex_init(&semaforo_processador[i], NULL);
     threads = malloc_safe(num_procs * sizeof(pthread_t));
 
     /* escolhe o metodo de escalonamento */
@@ -123,8 +126,12 @@ int main(int argc, char *argv[])
      que todas as threads terminem a execucao) */
   if(num_procs != 0)
   {  
-    for(i = 0; i < num_procs; i++)
+    /*for(i = 0; i < num_procs; i++){
       if(estado_processador[i] == EM_USO) i = 0;
+	/* DEPURACAO * printf("estou em uso\n");*
+	}*/
+    for(i = 0; i < num_procs; i++)
+    	pthread_join(threads[i], NULL);
     
     fprintf(arquivo_saida, "\n");
     fclose(arquivo_saida);
@@ -166,8 +173,10 @@ void *thread_function_fcfs(void *arg)
 
   if(tempo_decorrido() > proc->deadline) contador_deadlines_estourados++;
 
+  printf("Antes de liberar a cpu: semaforo_processador %d\n",semaforo_processador[proc->processador]);
   pthread_mutex_lock(&semaforo_processador[proc->processador]);
   estado_processador[proc->processador] = LIVRE;
+
   pthread_mutex_unlock(&semaforo_processador[proc->processador]);
 
   if(depurar)
@@ -209,7 +218,7 @@ void first_come_first_served()
        o processador que ele está usando como i+1 */
     pthread_mutex_lock(&semaforo_processador[i]);
     estado_processador[i] = EM_USO;
-    processo_atual->processador = i + 1;
+    processo_atual->processador = i;
     pthread_mutex_unlock(&semaforo_processador[i]);
 
     /* cria uma thread para o processo_atual e roda ela durante
@@ -219,11 +228,12 @@ void first_come_first_served()
       printf("Erro na criacao da thread.\n");
       abort();
     }
-
+    printf("acabou a fncao da thread");
     /* tira o proximo processo da lista */
     pthread_mutex_lock(&semaforo_lista_processos);
     processo_atual = retira_primeiro_elemento_da_lista();
     pthread_mutex_unlock(&semaforo_lista_processos);
+    printf("retirei elemento da lisra\n");
   }
 }
 

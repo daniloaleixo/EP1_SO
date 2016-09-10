@@ -7,3 +7,7 @@ auxiliares.o
 ep1
 ep1sh
 saida.txt
+arqs*
+resultado*
+.~*
+*.o
