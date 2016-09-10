@@ -223,8 +223,8 @@ void thread_function_srtn(void *arg)
                       ++linha_arquivo_saida);
     pthread_mutex_unlock(&semaforo_arq_saida);
 
-    /* Mudar para que so verifique se a thread terminou */
-    /* if(tempo_decorrido() > proc->deadline) contador_deadlines_estourados++; */
+    /* Verificar se a thread terminou */
+    if(tempo_decorrido() > proc->deadline) contador_deadlines_estourados++; 
   } 
 
 
