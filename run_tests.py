@@ -28,8 +28,28 @@ if len(sys.argv) > 4:
 
 #Executa os testes
 arquivos = os.listdir(directory)
-file_tempos = open("resultado_tempos.txt", "w")
 
+nome_file_tempos = ""
+nome_file_deadlines = ""
+if(tipo_escalonamento == 1): 
+	nome_file_tempos = nome_file_tempos + "fcfs_"
+	nome_file_deadlines = nome_file_deadlines + "fcfs_"
+if(tipo_escalonamento == '2'): 
+	nome_file_tempos = nome_file_tempos + "srtn_"
+	nome_file_deadlines = nome_file_deadlines + "srtn_"
+if(directory == "poucosProcessos/"): 
+	nome_file_tempos = nome_file_tempos + "poucos_"
+	nome_file_deadlines = nome_file_deadlines + "poucos_"
+if(directory == "mediosProcessos/"): 
+	nome_file_tempos = nome_file_tempos + "medios_"
+	nome_file_deadlines = nome_file_deadlines + "medios_"
+if(directory == "muitosProcessos/"): 
+	nome_file_tempos = nome_file_tempos + "muitos_"
+	nome_file_deadlines = nome_file_deadlines + "muitos_"
+
+file_tempos = open(nome_file_tempos + "tempos.txt", "w")
+
+#for i in range(0, 2):
 for i in range(0,len(arquivos)):
 	nome_arquivo_saida = dir_saida + "saida" + str(i) + ".txt"
 	arquivo_saida = open(nome_arquivo_saida, "w")
@@ -50,7 +70,7 @@ text_cmd = "cat "
 for arq in results:
 	text_cmd = text_cmd + " " + dir_result + arq
 
-text_cmd = text_cmd + " > resultados_deadline.txt"
+text_cmd = text_cmd + " > " + nome_file_deadlines + "deadline.txt"
 print text_cmd
 os.system(text_cmd)
 
