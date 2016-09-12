@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
     fprintf(arquivo_saida, "\n");
     fclose(arquivo_saida);
 
-    if(depurar)
+    if(TRUE || depurar)
       fprintf(stderr, "Quantidade de mudanças de contexto: %d\n",
               qtde_mudancas_contexto);
   }
