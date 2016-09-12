@@ -37,6 +37,7 @@ typedef struct processo {
 
 /* funcoes de threads */
 void *thread_function_fcfs(void *arg);
+void *thread_function_srtn(void *arg);
 
 /* funcoes de escalonamento */
 void first_come_first_served();
@@ -44,6 +45,7 @@ void shortest_remaining_time_next();
 void escalonamento_multiplas_filas();
 
 /* funcoes auxliares*/
+void conta_mudancas_de_contexto(int *pids_em_execucao);
 void imprime_todos_procs(Processo *lista);
 Processo *ordenar_metodo2(Processo *lista);
 Processo *retira_primeiro_elemento_da_lista();
@@ -70,8 +72,7 @@ pthread_t *threads;
 FILE *arquivo_saida;
 int num_procs = 0, depurar = FALSE, linha_arquivo_saida = 0,
     qtde_mudancas_contexto = 0, *estado_processador,
-    contador_deadlines_estourados = 0,
-    *pids_em_execucao;
+    *tempo_restante_do_pid, contador_deadlines_estourados = 0;
 double tempo_de_execucao = 0;
 
 int verbose = FALSE;
@@ -100,7 +101,6 @@ int main(int argc, char *argv[])
        alem de alocar um vetor de semaforos (um por processador) e um vetor de
        threads (uma por processador) */
     num_procs = get_nprocs();
-    /* DEPURACAO printf("num_procs: %d\n", num_procs);*/
     estado_processador = malloc_safe(num_procs * sizeof(int));
     for(i = 0; i < num_procs; i++)
       estado_processador[i] = LIVRE;
@@ -149,14 +149,13 @@ int main(int argc, char *argv[])
       fprintf(stderr, "Quantidade de mudanças de contexto: %d\n",
               qtde_mudancas_contexto);
   }
-  /* DEPURACAO */ printf("%d\n", contador_deadlines_estourados);
 
   return 0;
 }
 
 void *thread_function_fcfs(void *arg)
 {
-  float t0_processo = tempo_decorrido(),
+  float t0_processo = tempo_decorrido(), tf,
         tempo_decorrido_processo = 0;
   int i;
   Processo *proc = (Processo *) arg;
@@ -173,7 +172,7 @@ void *thread_function_fcfs(void *arg)
 
   pthread_mutex_lock(&semaforo_arq_saida);
   fprintf(arquivo_saida, "%s %f %f\n",
-          proc->nome, tempo_decorrido(), tempo_decorrido_processo);
+          proc->nome, tf = tempo_decorrido(), tf - proc->t0);
   if(depurar)
     fprintf(stderr, "%8.4fs | O processo %s terminou e esta na linha %d do "
                     "arquivo de saida\n", tempo_decorrido(), proc->nome,
@@ -193,9 +192,9 @@ void *thread_function_fcfs(void *arg)
   return NULL;
 }
 
-void thread_function_srtn(void *arg)
+void *thread_function_srtn(void *arg)
 {
-  float t0_processo = tempo_decorrido(),
+  float t0_processo = tempo_decorrido(), tf,
         tempo_decorrido_processo = 0;
   int i;
   Processo *proc = (Processo *) arg, *aux;
@@ -216,7 +215,7 @@ void thread_function_srtn(void *arg)
   {
     pthread_mutex_lock(&semaforo_arq_saida);
     fprintf(arquivo_saida, "%s %f %f\n",
-            proc->nome, tempo_decorrido(), tempo_decorrido_processo);
+            proc->nome, tf = tempo_decorrido(), tf - proc->t0);
     if(depurar)
       fprintf(stderr, "%8.4fs | O processo %s terminou e esta na linha %d do "
                       "arquivo de saida\n", tempo_decorrido(), proc->nome,
@@ -235,9 +234,7 @@ void thread_function_srtn(void *arg)
 
   /* Atualizamos o tempo restante do processo */
   proc->tempo_restante = proc->tempo_restante - tempo_de_execucao;
-
-
-  return NULL;
+  tempo_restante_do_pid[proc->linha_no_arquivo_trace] = proc->tempo_restante;
 }
 
 /* *****************************************
@@ -291,122 +288,74 @@ void first_come_first_served()
   }
 }
 
-/*
-
-***
-**
-**
-***********************************************************************************************************
-
-**********************************************************************************************************************************************************************************************************************
-***********************************************************************************************************
-**
-
-***
-**
-**
-
-***
-**
-**/
-
 void shortest_remaining_time_next(Processo *lista)
 {
   double primeiro_t0, proximo_t0;
-  int i;
+  int i, *pids_em_execucao;
   Processo *primeiro_processo, *processo_atual, *proximo_processo;
 
-  /* DEPRUCAO */ if(verbose) printf("\n\n\n\n\n\n\n\n\n\n\n\n\n\nVamos iniciar a funcao\n");
   pids_em_execucao = malloc_safe(num_procs * sizeof(int));
 
-  /* DEPURCAO */if(verbose) printf("lista de processos:   \n");
-  /* DEPURACAO */if(verbose)imprime_todos_procs(lista_processos);
-
-
-  /*
-  *     
-  *     PRIMEIRA INTERACAO 
-  */
+  /* PRIMEIRA ITERACAO */
 
   /* pega da lista o primeiro processo */
   pthread_mutex_lock(&semaforo_lista_processos);
   primeiro_processo = retira_primeiro_elemento_da_lista();
   pthread_mutex_unlock(&semaforo_lista_processos);
 
-  /* DEPURACAO */if(verbose)printf("Retirei o primeiro elemento da lista: %s\n", primeiro_processo->nome);
-  /* DEPURACAO */if(verbose)printf("A lista de processos agora esta assim: \n");
-  /* DEPURACAO */if(verbose)imprime_todos_procs(lista_processos);
-
   insere_na_lista_espera(primeiro_processo);
-  /* DEPURACAO */if(verbose)printf("Inseri o processo na lista de espera, que agora esta asssim\n");
-  /* DEPURACAO */if(verbose)imprime_todos_procs(lista_espera);
   
   /* Pegamos da lista de processos todos os processos que chegam junto com
      o primeiro processo, inserindo todos na lista de espera */
   primeiro_t0 = primeiro_processo->t0;
   for(processo_atual = retira_primeiro_elemento_da_lista();
       processo_atual != NULL && processo_atual->t0 <= primeiro_t0;
-      processo_atual = retira_primeiro_elemento_da_lista()){
+      processo_atual = retira_primeiro_elemento_da_lista())
     insere_na_lista_espera(processo_atual);
-  }
-  /* Se o utlimo processo que verificamos nao e nulo e so saiu do for por causa do seu t0, colocamos ele de novo na lista_procesos */
-  if(processo_atual != NULL)insere_na_lista_processos(processo_atual);
 
-  /* DEPURACAO */if(verbose)printf("Inseri todos os processos que tem t0 igual ao t0 do primeiro processo (%lf), agora a lista de espera ta assim\n", primeiro_processo->t0);
-  /* DEPURACAO */ if(verbose)imprime_todos_procs(lista_espera);
-
+  /* Se o utlimo processo que verificamos nao e nulo e so saiu do for por causa
+     do seu t0, colocamos ele de novo na lista_procesos */
+  if(processo_atual != NULL) insere_na_lista_processos(processo_atual);
 
   /* Espera até que o processo chegue (t >= t0) */
   while(tempo_decorrido() < primeiro_t0) usleep(100);
 
-  /* DEPURACAO */if(verbose)printf("Esperei ate ser rxecutado o primeiro process\n");
-
   /* nas linhas abaixo, se verifica quanto tempo de execucao daremos para os
      processos */
   proximo_processo = lista_processos;
-  if(proximo_processo != NULL){
+  if(proximo_processo != NULL)
+  {
     proximo_t0 = proximo_processo->t0;
     tempo_de_execucao = proximo_t0 - primeiro_t0;
-  } else {
-    /* DEPURACAO */if(verbose) printf("Não tem mais ninguem na lista de processos para entrar posso executar ate o fim dos processo UHULL\n");
   }
-
-  /* DEPURACAO */if(verbose) printf("Teremos %lf tempo de execaucao\n", tempo_de_execucao);
 
   ordenar_fila_espera();
 
-  /* DEPURACAO */ if(verbose)printf("Ordeneu fila de espera por remaining time, a lista esta assim:\n");
-  /* DEPURACAO */ if(verbose)imprime_todos_procs(lista_espera);
-
-
-  /* verificamos se ocorrerá algum evento (fim de um processo) antes de t0 que estipulamos
-      que termina quando um processo for entrar no sistema */
+  /* verificamos se algum processo vai terminar antes de que se rode os
+     processos durante tempo_de_execucao */
   for(processo_atual = lista_espera, i = 0;
       i < num_procs && processo_atual != NULL;
       i++, processo_atual = processo_atual->prox)
-    if(processo_atual->tempo_restante < tempo_de_execucao || tempo_de_execucao == 0)
+    if(processo_atual->tempo_restante < tempo_de_execucao ||
+       tempo_de_execucao == 0)
       tempo_de_execucao = processo_atual->tempo_restante;
 
-  /* DEPURACAO */if(verbose) printf("Existe algum evento que mudou o tempo_de_execucao? Agora o tempo de execucao e %lf\n", tempo_de_execucao);
+  /* Se so existe um processo que precisa ser rodado na fila de espera e nao
+     existe processos que irao entrar entao executamos ele ate o fim */
+  if(lista_processos == NULL &&
+     lista_espera != NULL &&
+     lista_espera->prox == NULL)
+    tempo_de_execucao = lista_espera->tempo_restante;
 
-
-  /* Se so existe um processo que precisa ser rodado na fila de espera e nao existe processos que irao entrar
-           entao executamos ele ate o fim */
-  if(lista_processos == NULL && lista_espera != NULL && lista_espera->prox == NULL) tempo_de_execucao = lista_espera->tempo_restante;
-
-
-  /* DEPIRACAO * printf("tempo_de_execucao: %lf\n", tempo_de_execucao);*/
-
-
-  /* DEPURACAO */if(verbose) printf("Vamos executar as threads\n");
-  /* executamos os processos que estao em primeiro lugar na fila, de acordo com seu remaining time */
-  processo_atual = retira_primeiro_elemento_da_lista_espera();
-  for(i = 0; i < num_procs && processo_atual != NULL; i++)
+  /* executamos os processos que estao em primeiro lugar na fila, de acordo com
+     seu remaining time */
+  for(processo_atual = retira_primeiro_elemento_da_lista_espera(), i = 0;
+      i < num_procs && processo_atual != NULL;
+      processo_atual = retira_primeiro_elemento_da_lista_espera(), i++)
   {
     processo_atual->processador = i;
-    /* DEPURACAO */if(verbose)  printf("Processo %s vai ser rodado no processador %d\n", processo_atual->nome, processo_atual->processador);
     /* cria uma thread para o processo_atual e roda ela durante
-       processo_atual->dt segundos (com consumo de CPU) */
+       tempo_de_execucao segundos (com consumo de CPU) */
     if(pthread_create(&threads[i], NULL, thread_function_srtn, processo_atual))
     {
       printf("Erro na criacao da thread.\n");
@@ -414,54 +363,42 @@ void shortest_remaining_time_next(Processo *lista)
     }
     pids_em_execucao[i] = processo_atual->linha_no_arquivo_trace;
     insere_na_lista_execucao(processo_atual);
-    /* DEPURACAO */if(verbose) printf("Inseri na lista de execucao, agora esta assim:\n");
-    /* DEPURACAO */if(verbose) imprime_todos_procs(lista_execucao);
-    processo_atual = retira_primeiro_elemento_da_lista_espera();
   }
-  /* Se o utlimo processo que verificamos nao e nulo e so saiu porque acabou os processdaores disponvieis,
-   colocamos ele de novo na lista_procesos */
+
+  /* Se o utlimo processo que verificamos nao e nulo e so saiu porque acabou os
+     processdaores disponvieis, colocamos ele de novo na lista_procesos */
   if(processo_atual != NULL) insere_na_lista_espera(processo_atual);
-
-
 
   /* esperamos os processos terminarem */
   for(i = 0; i < num_procs; ++i) pthread_join(threads[i], NULL);
-  /* DEPURACAO */if(verbose) printf("Esperamos os processos terminarem \n");
 
-
-  /* DEPURACAO */if(verbose) printf("Lista de execucao antes de eu tirar alguns processos \n");
-  /* DEPURACAO */if(verbose) imprime_todos_procs(lista_execucao);
-  /* vamos verificar os processos que ja acabaram a execucao e tira-los da lista de execucao */
-  for(processo_atual = lista_execucao; processo_atual != NULL; processo_atual = processo_atual->prox)
-    if(processo_atual->tempo_restante <= 0){
+  /* vamos verificar os processos que ja acabaram a execucao e tira-los da
+     lista de execucao */
+  for(processo_atual = lista_execucao; processo_atual != NULL;
+      processo_atual = processo_atual->prox)
+    if(processo_atual->tempo_restante <= 0)
       lista_execucao = processo_atual->prox;
-    }
-  /* DEPURACAO */if(verbose) printf("VErificamos quais processos terminaram a execucao e tiramos da lista de execucao, que agora esta assim: \n");
-  /* DEPURACAO */ if(verbose)imprime_todos_procs(lista_execucao);
-  /* DEPURACAO */if(verbose) printf("Lista de espera antes de adicionar a lista de execucao \n");
-  /* DEPURACAO */if(verbose) imprime_todos_procs(lista_espera);
 
-  /* retiramos todos os procesos da lista de execucao e colocamos na lista de espera 
-    neste caso vamos ate o final da lista de espera e inserimos os processos de execucao no final */
+  /* retiramos todos os procesos da lista de execucao e colocamos na lista de
+     espera. */
   if(lista_espera != NULL)
   {
-    for(processo_atual = lista_espera; processo_atual->prox != NULL; processo_atual = processo_atual->prox);
+    for(processo_atual = lista_espera;
+        processo_atual->prox != NULL;
+        processo_atual = processo_atual->prox);
     processo_atual->prox = lista_execucao;
   }
   else 
     lista_espera = lista_execucao;
-  /* DEPURACAO */ if(verbose)printf("Tirei os processos da execucao e coloquei na espera, que agora esta assim: \n");
-  /* DEPURACAO */if(verbose) imprime_todos_procs(lista_espera);
-  /* DEPURACAO */if(verbose) printf("Lista de processos: \n");
-  /* DEPURACAO */if(verbose) imprime_todos_procs(lista_processos);
 
-  /* E zera a lista de execucao */
+  /* E reseta a lista de execucao */
   lista_execucao = NULL;
+
+  /* TERMINADA A PRIMEIRA ITERACAO, A REPETIMOS NO LOOP ABAIXO ATE QUE SE
+     TERMINEM TODOS OS PROCESSOS */
 
   while(lista_espera != NULL || lista_processos != NULL)
   {
-
-    /* DEPURACAO * printf("\n--------------------------------------------------------MAIS UMA INTERACAO\n");*/
     if(lista_processos != NULL)
     {
       /* pega da lista o primeiro processo */
@@ -469,13 +406,7 @@ void shortest_remaining_time_next(Processo *lista)
       primeiro_processo = retira_primeiro_elemento_da_lista();
       pthread_mutex_unlock(&semaforo_lista_processos);
 
-      /* DEPURACAO */if(verbose)printf("Retirei o primeiro elemento da lista: %s\n", primeiro_processo->nome);
-      /* DEPURACAO */if(verbose)printf("A lista de exeucaoca agora esta assim: \n");
-      /* DEPURACAO */if(verbose)imprime_todos_procs(lista_execucao);
-
       insere_na_lista_espera(primeiro_processo);
-      /* DEPURACAO */if(verbose)printf("Inseri o processo na lista de espera, que agora esta asssim\n");
-      /* DEPURACAO */if(verbose)imprime_todos_procs(lista_espera);
       
       /* Pegamos da lista de processos todos os processos que chegam junto com
          o primeiro processo, inserindo todos na lista de espera */
@@ -485,57 +416,44 @@ void shortest_remaining_time_next(Processo *lista)
           processo_atual = retira_primeiro_elemento_da_lista()){
         insere_na_lista_espera(processo_atual);
       }
-      /* Se o utlimo processo que verificamos nao e nulo e so saiu do for por causa do seu t0, colocamos ele de novo na lista_procesos */
+      /* Se o utlimo processo que verificamos nao e nulo e so saiu do for por
+         causa do seu t0, colocamos ele de novo na lista_procesos */
       if(processo_atual != NULL) insere_na_lista_processos(processo_atual);
-      /* DEPURACAO */if(verbose)printf("Inseri todos os processos que tem t0 igual ao t0 do primeiro processo (%lf), agora a lista de espera ta assim\n", primeiro_processo->t0);
-
-      /* Espera até que o processo chegue (t >= t0) */
-      //TODO tem que mudar isso aqii while(tempo_decorrido() < primeiro_t0) usleep(100); 
- 
-      /* DEPURACAO */if(verbose)printf("Esperei ate ser rxecutado o primeiro process\n");
 
       /* nas linhas abaixo, se verifica quanto tempo de execucao daremos para os
          processos */
       proximo_processo = retira_primeiro_elemento_da_lista();
-      if(proximo_processo != NULL){
+      if(proximo_processo != NULL)
+      {
         proximo_t0 = proximo_processo->t0;
         tempo_de_execucao = proximo_t0 - primeiro_t0;
-      } else {
-        /* DEPURACAO */if(verbose) printf("Não tem mais ninguem na lista de processos para entrar posso executar ate o fim dos processo UHULL\n");
       }
     } /* fim do if lista_proecssos != NULL*/
 
     ordenar_fila_espera();
 
-    /* DEPURACAO */if(verbose) printf("Ordeneu fila de espera por remaining time, a lista esta assim:\n");
-    /* DEPURACAO */if(verbose) imprime_todos_procs(lista_espera);
-
-
-    /* verificamos se ocorrerá algum evento (fim de um processo) antes de t0 que estipulamos
-        que termina quando um processo for entrar no sistema */
+    /* verificamos se ocorrera' algum evento (fim de um processo) antes de t0
+       que estipulamos que termina quando um processo for entrar no sistema */
     for(processo_atual = lista_espera, i = 0;
         i < num_procs && processo_atual != NULL;
         i++, processo_atual = processo_atual->prox)
-      if(processo_atual->tempo_restante < tempo_de_execucao || tempo_de_execucao == 0)
-        tempo_de_execucao = processo_atual->tempo_restante;
+      if(processo_atual->tempo_restante < tempo_de_execucao ||
+         tempo_de_execucao == 0)
+        tempo_de_execucao = processo_atual->tempo_restante;  
 
-    /* DEPURACAO */if(verbose)printf("Existe algum evento que mudou o tempo_de_execucao? Agora o tempo de execucao e %lf\n", tempo_de_execucao);
-  
+    /* Se so existe um processo que precisa ser rodado na fila de espera e
+       nao existe processos que irao entrar entao executamos ele ate o fim */
+    if(lista_processos == NULL &&
+       lista_espera != NULL &&
+       lista_espera->prox == NULL)
+      tempo_de_execucao = lista_espera->tempo_restante;
 
-    /* Se so existe um processo que precisa ser rodado na fila de espera e nao existe processos que irao entrar
-             entao executamos ele ate o fim */
-    if(lista_processos == NULL && lista_espera != NULL && lista_espera->prox == NULL) tempo_de_execucao = lista_espera->tempo_restante;
-
-    /* DEPIRACAO * printf("tempo_de_execucao: %lf\n", tempo_de_execucao);*/
-
-
-    /* DEPURACAO */if(verbose) printf("Vamos executar as threads\n");
-    /* executamos os processos que estao em primeiro lugar na fila, de acordo com seu remaining time */
+    /* executamos os processos que estao em primeiro lugar na fila,
+       de acordo com seu remaining time */
     processo_atual = retira_primeiro_elemento_da_lista_espera();
     for(i = 0; i < num_procs && processo_atual != NULL; i++)
     {
       processo_atual->processador = i;
-      /* DEPURACAO */if(verbose)  printf("Processo %s vai ser rodado no processador %d\n", processo_atual->nome, processo_atual->processador);
       /* cria uma thread para o processo_atual e roda ela durante
          processo_atual->dt segundos (com consumo de CPU) */
       if(pthread_create(&threads[i], NULL, thread_function_srtn, processo_atual))
@@ -543,77 +461,80 @@ void shortest_remaining_time_next(Processo *lista)
         printf("Erro na criacao da thread.\n");
         abort();
       }
-      pids_em_execucao[i] = processo_atual->linha_no_arquivo_trace;
       insere_na_lista_execucao(processo_atual);
-      /* DEPURACAO */if(verbose) printf("Inseri na lista de execucao, agora esta assim:\n");
-      /* DEPURACAO */if(verbose) imprime_todos_procs(lista_execucao);
       processo_atual = retira_primeiro_elemento_da_lista_espera();
     }
-    /* Se o utlimo processo que verificamos nao e nulo e so saiu porque acabou os processdaores disponvieis,
-     colocamos ele de novo na lista_procesos */
+    /* contamos quantas mudancas de contexto houve e atualizamos o vetor de
+       controle pids_em_execucao*/
+    conta_mudancas_de_contexto(pids_em_execucao);
+    for(i = 0, processo_atual = lista_execucao; i < num_procs; i++)
+    {
+      if(processo_atual != NULL)
+      {
+        pids_em_execucao[i] = processo_atual->linha_no_arquivo_trace;
+        processo_atual = processo_atual->prox;
+      }
+      else
+        pids_em_execucao[i] = -1;
+    }
+
+    /* Se o ultimo processo que verificamos nao e nulo e so saiu porque acabou
+       os processdaores disponvieis, colocamos ele de novo na lista_processos */
     if(processo_atual != NULL) insere_na_lista_espera(processo_atual);
 
-
-
-    /* esperamos os processos terminarem */
+    /* esperamos os processos rodarem o tempo estipulado */
     for(i = 0; i < num_procs; ++i) pthread_join(threads[i], NULL);
-    /* DEPURACAO */if(verbose) printf("----------------------------------------------Esperamos os processos terminarem \n");
 
-
-    /* DEPURACAO */if(verbose) printf("Lista de execucao antes de eu tirar alguns processos \n");
-    /* DEPURACAO */if(verbose) imprime_todos_procs(lista_execucao);
-    /* vamos verificar os processos que ja acabaram a execucao e tira-los da lista de execucao */
-    for(processo_atual = lista_execucao; processo_atual != NULL && processo_atual->tempo_restante <= 0; 
-                                                                  processo_atual = processo_atual->prox){
+    /* vamos verificar os processos que ja acabaram a execucao e tira-los
+       da lista de execucao */
+    for(processo_atual = lista_execucao;
+        processo_atual != NULL && processo_atual->tempo_restante <= 0; 
+        processo_atual = processo_atual->prox)
       lista_execucao = processo_atual->prox;
-    }
-    /* DEPURACAO */if(verbose) printf("VErificamos quais processos terminaram a execucao e tiramos da lista de execucao, que agora esta assim: \n");
-    /* DEPURACAO */if(verbose) imprime_todos_procs(lista_execucao);
-    /* DEPURACAO */if(verbose) printf("Lista de espera antes de adicionar a lista de execucao \n");
-    /* DEPURACAO */if(verbose) imprime_todos_procs(lista_espera);
 
-    /* retiramos todos os procesos da lista de execucao e colocamos na lista de espera 
-      neste caso vamos ate o final da lista de espera e inserimos os processos de execucao no final */
-    /* DEPURACAO */if(verbose) printf("Lista de espera agora:\n");
-    /* DEPURACAO */if(verbose) imprime_todos_procs(lista_espera);
-
+    /* retiramos todos os procesos da lista de execucao e colocamos na lista
+       de espera */
     if(lista_espera != NULL)
     {
-      /* DEPURACAO */if(verbose) printf("A lista de espera nao e nula\n");
-      for(processo_atual = lista_espera; processo_atual->prox != NULL; processo_atual = processo_atual->prox);
+      for(processo_atual = lista_espera;
+          processo_atual->prox != NULL;
+          processo_atual = processo_atual->prox);
       processo_atual->prox = lista_execucao;
     }
-    else {
+    else
       lista_espera = lista_execucao;
-    }
-    /* DEPURACAO */if(verbose) printf("Tirei os processos da execucao e coloquei na espera, que agora esta assim: \n");
-    /* DEPURACAO */if(verbose) imprime_todos_procs(lista_espera);
 
-    /* E zera a lista de execucao */
+    /* E reseta a lista de execucao */
     lista_execucao = NULL;
   }
-
-
-
-
-
-
-
-  //merge_sort(&lista, 3);
-  /*return lista;*/
 }
 
 void escalonamento_multiplas_filas(Processo *lista)
 {
-  merge_sort(&lista, 5);
-  /*return lista;*/
+  printf("nao fui implementado.\n");
+  /* merge_sort(&lista, 5);
+     return lista;*/
 }
 
-/* *****************************************
+/* funcoes auxiliares */
 
-                funcoes auxiliares 
-
-  ***************************************** */
+void conta_mudancas_de_contexto(int *pids_em_execucao)
+{
+  
+  int i, pid, candidato_mudanca;
+  Processo *proc;
+  for(i = 0; i < num_procs; i++)
+  {
+    pid = pids_em_execucao[i];
+    candidato_mudanca = TRUE;
+    if(pid == -1) continue;
+    for(proc = lista_execucao; proc != NULL; proc = proc->prox)
+      if(pid == proc->linha_no_arquivo_trace)
+        candidato_mudanca = FALSE;
+    if(candidato_mudanca == TRUE && tempo_restante_do_pid[pid] > 0)
+      qtde_mudancas_contexto++;
+  }
+}
 
 Processo *retira_primeiro_elemento_da_lista()
 {
@@ -674,40 +595,52 @@ Processo *interpreta_entrada(char *nome_arquivo)
     proc = novo_proc;
   }
 
+  tempo_restante_do_pid = malloc_safe(i * sizeof(int));
+  for(proc = lista; proc != NULL; proc = proc->prox)
+    tempo_restante_do_pid[proc->linha_no_arquivo_trace] = proc->tempo_restante;
+
   return lista;
 }
 
 
-void insere_na_lista_espera(Processo *proc){
+void insere_na_lista_espera(Processo *proc)
+{
   if(lista_espera == NULL)
     lista_espera = proc;
-  else {
+  else
+  {
     proc->prox = lista_espera;
     lista_espera = proc;
   }
 }
 
-void insere_na_lista_processos(Processo *proc){
+void insere_na_lista_processos(Processo *proc)
+{
   if(lista_processos == NULL)
     lista_processos = proc;
-  else {
+  else
+  {
     proc->prox = lista_processos;
     lista_processos = proc;
   }
 }
 
-void ordenar_fila_espera(){
+void ordenar_fila_espera()
+{
   merge_sort(&lista_espera, 2);
 }
 
-Processo *retira_primeiro_elemento_da_lista_espera(){ 
+Processo *retira_primeiro_elemento_da_lista_espera()
+{ 
   if(lista_espera == NULL) return NULL;
   Processo *elemento = lista_espera;
   lista_espera = lista_espera->prox;
   elemento->prox = NULL;
   return elemento;
 }
-void insere_na_lista_execucao(Processo *proc){
+
+void insere_na_lista_execucao(Processo *proc)
+{
   Processo *aux;
 
   if(lista_execucao == NULL)
